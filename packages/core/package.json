@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "check": "node --experimental-strip-types ./test/url.check.ts",
-    "check:wechat": "tsx ./test/wechat.check.ts"
+    "check:wechat": "tsx ./test/wechat.check.ts",
+    "check:xhs": "tsx ./test/xhs.check.ts"
   },
   "dependencies": {
     "cheerio": "^1.0.0"

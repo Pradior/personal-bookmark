@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>小红书</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.__INITIAL_STATE__ = {
+        "user": { "loggedIn": false },
+        "note": {
+          "noteDetailMap": {
+            "6700abcd1234": {
+              "note": {
+                "title": "一条用来验证解析器的测试笔记",
+                "desc": "第一段正文，长度要够。\n第二段正文，里面有花括号 { 和引号 \" 用来考验 JSON 提取。",
+                "time": 1732000000000,
+                "user": { "nickname": "测试账号" },
+                "imageList": [
+                  {
+                    "urlDefault": "https://sns-webpic.xhscdn.com/aaa.jpg",
+                    "width": 1080,
+                    "height": 1440
+                  },
+                  { "urlPre": "https://sns-webpic.xhscdn.com/bbb.jpg" },
+                  { "urlDefault": "" }
+                ]
+              }
+            }
+          }
+        },
+        "someUndefined": undefined
+      };
+    </script>
+  </body>
+</html>

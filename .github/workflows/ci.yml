@@ -57,6 +57,9 @@ jobs:
       - name: 自检：公众号解析与清洗
         run: pnpm --filter @pb/core check:wechat
 
+      - name: 自检：小红书解析
+        run: pnpm --filter @pb/core check:xhs
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

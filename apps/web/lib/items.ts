@@ -55,3 +55,10 @@ export async function getItem(id: string) {
   const rows = await db.select().from(item).where(eq(item.id, id)).limit(1);
   return rows[0] ?? null;
 }
+
+/** 有在处理的条目时，列表页需要定时刷新 */
+export function hasProcessing(list: ItemSummary[]): boolean {
+  return list.some(
+    (i) => i.fetchState === 'queued' || i.fetchState === 'fetching' || i.fetchState === 'assets',
+  );
+}

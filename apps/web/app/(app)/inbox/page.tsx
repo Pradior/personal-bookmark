@@ -1,9 +1,10 @@
+import AutoRefresh from '@/components/AutoRefresh';
 import EmptyState from '@/components/EmptyState';
 import ItemCard from '@/components/ItemCard';
 import ListPage from '@/components/ListPage';
 import SaveBox from '@/components/SaveBox';
 import { IconInbox } from '@/components/icons';
-import { listItems } from '@/lib/items';
+import { hasProcessing, listItems } from '@/lib/items';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export default async function InboxPage() {
 
   return (
     <ListPage title="收件箱" dbReady={items !== null}>
+      <AutoRefresh active={hasProcessing(list)} />
       <SaveBox />
       {list.length > 0 ? (
         <div className="cards">

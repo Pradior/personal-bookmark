@@ -1,8 +1,9 @@
+import AutoRefresh from '@/components/AutoRefresh';
 import EmptyState from '@/components/EmptyState';
 import ItemCard from '@/components/ItemCard';
 import ListPage from '@/components/ListPage';
 import { IconLayers } from '@/components/icons';
-import { listItems } from '@/lib/items';
+import { hasProcessing, listItems } from '@/lib/items';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,7 @@ export default async function AllItemsPage() {
 
   return (
     <ListPage title="全部条目" dbReady={items !== null}>
+      <AutoRefresh active={hasProcessing(list)} />
       {list.length > 0 ? (
         <div className="cards">
           {list.map((item) => (
