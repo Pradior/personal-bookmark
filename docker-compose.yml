@@ -1,20 +1,23 @@
 # ============================================================================
 #  个人bookmark —— Docker 编排
 #
-#  本地开发（只起数据库，web/worker 用 pnpm dev 跑）：
-#      docker compose up -d pb-db
+#  ── 从 GitHub 部署（推荐）──────────────────────────────────────────────
+#    git clone https://github.com/Pradior/personal-bookmark.git
+#    cd personal-bookmark
+#    cp .env.example .env && vi .env      # 填 DB_PASSWORD / AUTH_SECRET / WEB_PORT
+#    mkdir -p data/{db,assets,config}
+#    docker compose up -d --build
 #
-#  完整部署（在 NAS 或任意装了 Docker 的机器上，从源码构建）：
-#      cp .env.example .env && 编辑 .env
-#      docker compose up -d --build
+#  ── 日常更新 ──────────────────────────────────────────────────────────
+#    git pull && docker compose up -d --build
+#    建议先在 GitHub → Actions 确认那次提交是绿的，再 pull。
 #
-#  常用：
-#      docker compose logs -f pb-web          看 web 日志（首启密码在这里）
-#      docker compose logs -f pb-worker       看抓取/转码任务日志
-#      docker compose down                    停止（保留数据）
-#      docker compose up -d --build           改代码后重建
+#  ── 本地开发 ──────────────────────────────────────────────────────────
+#    docker compose up -d pb-db           # 只起数据库，web/worker 用 pnpm dev
 #
-#  数据全在 ./data 下，备份就是打包这一个目录。
+#  ── 数据 ──────────────────────────────────────────────────────────────
+#    全在 ./data 下：db / assets / config（含管理员密码哈希）
+#    ⚠ 删项目目录 = 连数据一起删。要保留就先把 data/ 备份出去。
 # ============================================================================
 
 name: personal-bookmark
@@ -37,7 +40,7 @@ services:
       POSTGRES_USER: bookmark
       POSTGRES_PASSWORD: ${DB_PASSWORD:?请在 .env 里设置 DB_PASSWORD}
       TZ: ${TZ:-Asia/Shanghai}
-    # 按 16GB 内存的机器调参；小内存机器可把 shared_buffers 降到 256MB
+    # 按 16GB 内存的机器调参；小内存机器把 shared_buffers 降到 256MB
     command: >
       postgres
       -c shared_buffers=512MB
@@ -70,12 +73,12 @@ services:
       DATABASE_URL: postgres://bookmark:${DB_PASSWORD}@pb-db:5432/bookmark
       APP_NAME: ${APP_NAME:-个人bookmark}
       APP_SHORT: ${APP_SHORT:-pb}
-      AUTH_SECRET: ${AUTH_SECRET:?请在 .env 里设置 AUTH_SECRET}
-      # 留空则首启随机生成并打印到日志；填了就优先用它
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ASSETS_DIR: /data/assets
       CONFIG_DIR: /data/config
-      # PWA 安装与分享链接依赖它，建议填实际的 https 地址
+      AUTH_SECRET: ${AUTH_SECRET:?请在 .env 里设置 AUTH_SECRET}
+      # 留空 = 首启随机生成并打印到日志
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # PWA 安装与分享链接依赖它，配好 HTTPS 后改成实际地址
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
       # 启动时自动跑迁移；想手动控制就设 false
       AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
@@ -85,7 +88,7 @@ services:
       SOURCE_CACHE_ITEMS: ${SOURCE_CACHE_ITEMS:-50}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      # 宿主机端口：绿联/群晖上避开 80、443（系统 Web UI 占用）
+      # 宿主端口避开 80 / 443（NAS 系统 Web UI 占用）
       - "${WEB_PORT:-3000}:3000"
     volumes:
       - ./data/assets:/data/assets
@@ -104,12 +107,13 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
+      # 首启要跑数据库迁移，给足冷启动时间
       start_period: 60s
     logging: *default-logging
     restart: unless-stopped
 
   # ── Worker：抓取 / 转码 / 分词 / 向量 / 分类 ─────────────────────────
-  # 用 pg-boss，队列表就在同一个 Postgres 里，不需要 Redis
+  # 队列用 pg-boss，表就在同一个 Postgres 里，不需要 Redis
   pb-worker:
     build:
       context: .
@@ -120,10 +124,11 @@ services:
     init: true
     environment:
       DATABASE_URL: postgres://bookmark:${DB_PASSWORD}@pb-db:5432/bookmark
+      APP_NAME: ${APP_NAME:-个人bookmark}
       APP_SHORT: ${APP_SHORT:-pb}
       ASSETS_DIR: /data/assets
       CONFIG_DIR: /data/config
-      # N100 四核，3 足够；别设太大，会跟 web 抢 CPU
+      # N100 四核，3 足够；太大反而跟 web 抢 CPU
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-3}
       DISPLAY_MAX_EDGE: ${DISPLAY_MAX_EDGE:-2000}
       DISPLAY_WEBP_QUALITY: ${DISPLAY_WEBP_QUALITY:-85}
@@ -147,26 +152,25 @@ services:
 # ============================================================================
 #  备注
 #
-#  1) 文件权限
-#     默认容器以 root 运行，./data 下的文件属主是 root。若希望归 NAS 账号所有
-#     （方便 File Station / Hyper Backup 访问），在 NAS 上执行：
-#         id                                   # 记下 uid/gid，例如 1000
+#  1) 为什么 web / worker 的环境变量写了两遍
+#     YAML 锚点合并（<<: *app-env）在 compose v2 上能用，但在某些环境下
+#     environment: 里的合并键会静默失效，排查起来很痛苦。宁可重复 6 行。
+#
+#  2) 文件权限
+#     默认容器以 root 运行，./data 下文件属主是 root。想让 NAS 账号可读写：
+#         id                              # 记下 uid:gid，绿联常见 1000:1000
 #         sudo chown -R 1000:1000 data
-#     然后给 pb-web / pb-worker 各加一行（数值换成你的）：
-#         user: "1000:1000"
+#     然后给 pb-web / pb-worker 各加一行：user: "1000:1000"
+#     ⚠ 别一上来就加：uid 填错容器起不来，报错还很不直观。
 #
-#  2) 无头浏览器（可选，Sprint 2 之后才需要）
-#     抓动态页/截图时才用，默认不启。启用方式：
-#         docker compose --profile browser up -d
-#     目前镜像里还没有浏览器服务端代码，先留占位。
-#
-#  3) 用预构建镜像（等你把镜像推到 registry 之后）
-#     删掉 build: 段，把 image: 换成完整地址即可，例如：
-#         image: ghcr.io/your-name/personal-bookmark-web:${TAG:-latest}
+#  3) 构建耗时
+#     N100 上首次 --build 约 10–20 分钟。之后只改业务代码，pnpm 依赖层有缓存
+#     会快很多。想彻底跳过构建：把镜像推到 registry 后，删掉 build: 段、
+#     把 image: 换成 ghcr.io/pradior/personal-bookmark-web:${TAG} 之类。
 #
 #  4) 备份
 #         docker compose exec -T pb-db pg_dump -U bookmark -Fc bookmark \
 #           > backup/db-$(date +%F).dump
 #         tar czf backup/assets-$(date +%F).tar.gz -C data assets
-#     db 目录不能热备，必须先 pg_dump。
+#     data/db 不能热备，必须先 pg_dump。
 # ============================================================================

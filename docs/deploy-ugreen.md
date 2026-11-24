@@ -10,22 +10,30 @@
 | SSH | 控制面板 → 终端机 → 启用 SSH（默认 22 端口） |
 | 目录 | 建议 `/volume1/docker/personal-bookmark` |
 | 端口 | **不要用 80 / 443**（UGOS Web UI 占用）；本文示例用 `3081` |
+| Git | 从 GitHub 部署需要 NAS 能访问 github.com |
 
 > 本机 docker 需要 `sudo`。想免 sudo：`sudo usermod -aG docker $USER` 后**重新登录 SSH**。
 > 注意这等于给该账号 root 权限，多人共用别这么干。
 
-## 1. 上传代码
-
-把整个项目目录传到 `/volume1/docker/personal-bookmark`（File Station 拖拽即可）。
-
-## 2. 建数据目录
+## 1. 从 GitHub 部署
 
 ```bash
-cd /volume1/docker/personal-bookmark
+cd /volume1/docker
+git clone https://github.com/Pradior/personal-bookmark.git
+cd personal-bookmark
+```
+
+> **NAS 访问不了 github.com 时**（国内网络常见）：给 git 配代理，
+> 例如 `git config --global http.proxy http://<代理地址>:7897`；
+> 或者在有网的机器上 clone 后整个目录拷到 NAS（`.git` 一起拷，之后仍能 pull）。
+
+### 1.1 建数据目录
+
+```bash
 mkdir -p data/{db,assets,config}
 ```
 
-## 3. 配置 .env
+### 1.2 配置 .env
 
 ```bash
 cp .env.example .env
@@ -58,7 +66,7 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 ADMIN_PASSWORD=你的密码
 ```
 
-## 4. 启动
+### 1.3 启动
 
 ```bash
 sudo docker compose up -d --build     # 首次构建镜像，N100 上约 10–20 分钟
@@ -68,7 +76,19 @@ sudo docker compose logs -f pb-web    # 看启动日志
 
 首启会自动跑数据库迁移（扩展 → 表结构 → 函数索引）。
 
-## 5. 拿管理员密码
+### 1.4 以后更新
+
+```bash
+sh scripts/nas-deploy.sh
+```
+
+脚本会：拉最新代码 → 重建镜像 → 等 `pb-web` 变 healthy → 打印状态。
+等价于手动执行 `git pull && docker compose up -d --build`。
+
+> 习惯：先在 GitHub → **Actions** 看一眼那次提交是绿的，再在 NAS 上更新。
+> CI 跑的就是类型检查 + 三套自检 + 构建，绿了说明不会白等十几分钟。
+
+## 2. 拿管理员密码
 
 **打开一次登录页**，然后：
 
@@ -89,7 +109,7 @@ sudo docker compose logs pb-web | tail -30
 
 然后浏览器打开 `http://NAS_IP:3081` 登录。
 
-## 6. 验证链路
+## 3. 验证链路
 
 设置页建一个 PAT，然后：
 
@@ -107,7 +127,7 @@ curl -sS http://127.0.0.1:3081/api/v1/items \
 sudo docker compose exec pb-web node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(async r=>{console.log(r.status, await r.text())})"
 ```
 
-## 7. HTTPS（PWA 安装需要）
+## 4. HTTPS（PWA 安装需要）
 
 「添加到主屏幕」和 Service Worker 都要求 secure context，`http://192.168.x.x` 不行。
 
@@ -119,7 +139,7 @@ sudo docker compose exec pb-web node -e "fetch('http://127.0.0.1:3000/api/v1/hea
 
 配好后把 `.env` 的 `PUBLIC_BASE_URL` 改成实际 `https://` 地址并 `sudo docker compose up -d`。
 
-## 8. 备份
+## 5. 备份
 
 ```bash
 # 数据库必须 pg_dump，不能热备 data/db 目录
@@ -130,7 +150,7 @@ tar czf backup/assets-$(date +%F).tar.gz -C data assets
 
 也可以让 Hyper Backup 直接备份整个项目目录（先跑上面的 dump）。
 
-## 9. 常用命令
+## 6. 常用命令
 
 ```bash
 sudo docker compose logs -f pb-worker     # 抓取任务日志
@@ -139,7 +159,7 @@ sudo docker compose up -d --build         # 改了代码后
 sudo docker compose down                  # 停止（保留数据）
 ```
 
-## 10. 排错对照表
+## 7. 排错对照表
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
@@ -168,7 +188,7 @@ curl -s -o /dev/null -w '%{http_code} %{url_effective}\n' -L \
 
 输出 URL 里出现 `wappoc_appmsgcaptcha` 即为被拦。
 
-## 11. 文件权限（可选）
+## 8. 文件权限（可选）
 
 默认容器以 root 运行，`data/` 下文件属主是 root。想让 NAS 账号可读写：
 
