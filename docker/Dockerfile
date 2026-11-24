@@ -28,11 +28,13 @@ COPY . .
 RUN pnpm --filter @pb/web build
 
 # ── 运行时：worker ────────────────────────────────────
-# 直接用 node 的类型剥离跑 TS，省掉一层编译产物
+# 用 tsx 跑 TS 源码。不能用 node --experimental-strip-types：
+# 类型剥离不支持无扩展名的相对导入（import './schema'），而 workspace 包
+# 内部全是这种写法，会在启动瞬间 MODULE_NOT_FOUND。
 FROM base AS worker
 ENV NODE_ENV=production
 COPY --from=builder /app ./
-CMD ["node", "--experimental-strip-types", "apps/worker/src/index.ts"]
+CMD ["node", "node_modules/tsx/dist/cli.mjs", "apps/worker/src/index.ts"]
 
 # ── 运行时：web ───────────────────────────────────────
 FROM base AS web

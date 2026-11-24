@@ -135,10 +135,40 @@ jobs:
           # 但构建时间翻倍，且 sharp 需要对应的预编译二进制。
           platforms: linux/amd64
           push: true
+          # worker 要在本地跑一次冒烟测试，所以载入本地镜像
+          load: ${{ matrix.target == 'worker' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.target }}
           cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+
+      # 防的是一类很贵的坑：镜像构建成功、但容器一起来就崩。
+      # 比如 worker 曾用 --experimental-strip-types 启动，而 workspace 包内部
+      # 是无扩展名导入，构建能过、运行时 MODULE_NOT_FOUND，任务全卡在 queued。
+      # 不设 DATABASE_URL，断言它走到"未设置"的检查才退出 —— 这说明入口真的加载了。
+      - name: 冒烟测试 worker 入口
+        if: matrix.target == 'worker'
+        run: |
+          set +e
+          out=$(docker run --rm -e DATABASE_URL= "${IMAGE}" 2>&1)
+          code=$?
+          echo "$out"
+          echo "---"
+          if printf '%s' "$out" | grep -qE 'MODULE_NOT_FOUND|Cannot find module|ERR_MODULE'; then
+            echo "❌ worker 入口加载失败（模块解析问题）"
+            exit 1
+          fi
+          if [ "$code" -eq 0 ]; then
+            echo "❌ 期望非零退出，实际退出码 0"
+            exit 1
+          fi
+          if ! printf '%s' "$out" | grep -q 'DATABASE_URL'; then
+            echo "❌ 没有走到 DATABASE_URL 检查，说明入口没真正跑起来"
+            exit 1
+          fi
+          echo "✅ worker 入口可加载"
+        env:
+          IMAGE: ghcr.io/${{ steps.owner.outputs.name }}/${{ matrix.image }}:latest
 
       - name: 输出摘要
         run: |
