@@ -12,7 +12,7 @@
     "dev:worker": "pnpm --filter @pb/worker dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "check": "pnpm --filter @pb/core check && pnpm --filter @pb/core check:wechat",
+    "check": "node --experimental-strip-types packages/core/test/url.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/wechat.check.ts",
     "check:compose": "node scripts/check-compose.mjs",
     "db:generate": "pnpm --filter @pb/db generate",
     "db:migrate": "pnpm --filter @pb/db migrate"

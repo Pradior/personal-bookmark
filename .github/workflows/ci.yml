@@ -1,0 +1,69 @@
+name: CI
+
+# 每次 push / PR 都跑一遍基础构建与自检。
+# 目的：别把编译不过的代码推到 NAS 上白等十几分钟构建。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新提交取消上一次未跑完的，省额度也省等待
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck / self-check / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 顺序很重要：先让 pnpm 可用，后面才能缓存它的 store
+      - name: 启用 pnpm（按 packageManager 字段的版本）
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.28.5 --activate
+          pnpm --version
+
+      - name: 缓存 pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: 安装依赖
+        # --frozen-lockfile：lockfile 与 package.json 不一致时直接失败，
+        # 避免"本地能装、CI 装的不一样"
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查（5 个包）
+        run: pnpm -r typecheck
+
+      - name: 自检：URL 规范化
+        run: pnpm --filter @pb/core check
+
+      - name: 自检：公众号解析与清洗
+        run: pnpm --filter @pb/core check:wechat
+
+      - name: 校验 docker-compose 与 Dockerfile
+        run: pnpm check:compose
+
+      - name: 构建 Web
+        run: pnpm --filter @pb/web build
+        env:
+          # 构建期不需要真实数据库；给个占位值避免误连
+          DATABASE_URL: postgres://bookmark:build@127.0.0.1:5432/bookmark
+          AUTH_SECRET: ci-build-only-secret-not-used-at-build-time
+          NEXT_TELEMETRY_DISABLED: 1
