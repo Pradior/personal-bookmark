@@ -1,2 +1,35 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# 统一换行符：仓库里一律 LF。
+# 开发在 Windows、部署在 Linux（NAS），不统一会在 diff 里刷出一堆假改动。
+* text=auto eol=lf
+
+# 明确的文本类型
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.css   text eol=lf
+*.sql   text eol=lf
+*.sh    text eol=lf
+*.html  text eol=lf
+Dockerfile        text eol=lf
+*.example         text eol=lf
+
+# 二进制
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.tar   binary
+*.gz    binary
+*.dump  binary
+
+# lockfile 不要参与 diff 统计，也别在合并时被自动改写
+pnpm-lock.yaml linguist-generated=true merge=binary
