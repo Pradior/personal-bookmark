@@ -1,13 +1,17 @@
 #!/bin/sh
-# 在 NAS 上从一个已 clone 的仓库更新并重启。
+# 在 NAS 上更新到最新镜像并重启。
 #
-#   sh scripts/nas-deploy.sh
+#   sh scripts/nas-deploy.sh          # 拉最新镜像
+#   FORCE_LOGIN=1 sh scripts/nas-deploy.sh
 #
-# 做的事：拉最新代码 → 重建镜像 → 等 pb-web 变 healthy → 打印状态。
-# 前提：仓库目录里已经有 .env 和 data/{db,assets,config}。
+# 做的事：拉镜像 → 重启 → 等 pb-web 变 healthy → 打印状态。
+# 前提：目录里已有 docker-compose.yml 和 .env，data/ 已建好。
+#
+# ⚠ 私有 GHCR 镜像需要先登录一次（见 docs/deploy-ugreen.md）：
+#     echo <PAT> | docker login ghcr.io -u <用户名> --password-stdin
 set -e
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." 2>/dev/null || true
 
 # 有的机器 docker 需要 sudo
 if docker info >/dev/null 2>&1; then
@@ -17,21 +21,34 @@ else
   echo "（docker 需要 sudo，已自动加上）"
 fi
 
-echo "==> 当前提交: $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
-
-echo "==> 检查 .env"
+echo "==> 检查环境"
+if [ ! -f docker-compose.yml ]; then
+  echo "❌ 当前目录没有 docker-compose.yml。请在部署目录里运行本脚本。" >&2
+  exit 1
+fi
 if [ ! -f .env ]; then
   echo "❌ 缺少 .env。先 cp .env.example .env 并填 DB_PASSWORD / AUTH_SECRET" >&2
   exit 1
 fi
 
-echo "==> 拉取最新代码"
-git pull --ff-only
+TAG_VALUE=$(grep -E '^TAG=' .env | cut -d= -f2)
+echo "    镜像标签: ${TAG_VALUE:-latest}"
 
-echo "==> 更新到: $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
+echo "==> 拉取镜像"
+if ! $DC compose pull; then
+  cat >&2 <<'EOF'
+❌ 拉取失败。常见原因：
+   1) 镜像是私有的但没登录 —— 执行：
+        echo <你的PAT> | docker login ghcr.io -u <GitHub用户名> --password-stdin
+      PAT 只需要 read:packages 权限。
+   2) 这台机器连不上 ghcr.io —— 需要给 dockerd 配代理。
+   3) 镜像还不存在 —— 去 GitHub → Actions 看 images job 是否成功。
+EOF
+  exit 1
+fi
 
-echo "==> 重建并启动（N100 上可能几分钟）"
-$DC compose up -d --build
+echo "==> 重启"
+$DC compose up -d
 
 echo "==> 等待 pb-web 健康检查通过…"
 i=0

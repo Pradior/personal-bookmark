@@ -1,7 +1,10 @@
 name: CI
 
-# 每次 push / PR 都跑一遍基础构建与自检。
-# 目的：别把编译不过的代码推到 NAS 上白等十几分钟构建。
+# 两个 job：
+#   verify —— 类型检查 + 三套自检 + compose 校验 + Web 构建
+#   images —— 构建 web / worker 镜像并推到 GHCR（只在 main 且 verify 通过后）
+#
+# 目的：NAS 上不再需要源码和 docker build，只 pull 镜像即可。
 on:
   push:
     branches: [main]
@@ -44,8 +47,7 @@ jobs:
             pnpm-store-${{ runner.os }}-
 
       - name: 安装依赖
-        # --frozen-lockfile：lockfile 与 package.json 不一致时直接失败，
-        # 避免"本地能装、CI 装的不一样"
+        # --frozen-lockfile：lockfile 与 package.json 不一致时直接失败
         run: pnpm install --frozen-lockfile
 
       - name: 类型检查（5 个包）
@@ -70,3 +72,80 @@ jobs:
           DATABASE_URL: postgres://bookmark:build@127.0.0.1:5432/bookmark
           AUTH_SECRET: ci-build-only-secret-not-used-at-build-time
           NEXT_TELEMETRY_DISABLED: 1
+
+  images:
+    name: build & push images
+    # 只有 main 上的提交才发布；PR 里只 verify 不推镜像
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: web
+            image: personal-bookmark-web
+          - target: worker
+            image: personal-bookmark-worker
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # GHCR 的镜像名必须全小写，而 GitHub 用户名可能带大写（Pradior）
+      - name: 计算小写 owner
+        id: owner
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: 设置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.owner.outputs.name }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short,prefix=sha-
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: 构建并推送（${{ matrix.target }}）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: ${{ matrix.target }}
+          # NAS 是 Intel N100（amd64）。要支持 ARM 就加 linux/arm64，
+          # 但构建时间翻倍，且 sharp 需要对应的预编译二进制。
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+
+      - name: 输出摘要
+        run: |
+          {
+            echo "### ${{ matrix.target }} 镜像已推送"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

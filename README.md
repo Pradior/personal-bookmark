@@ -90,6 +90,21 @@ pb-web (Next.js)  +  pb-worker (抓取/转码/索引)  +  pb-db (Postgres + pgve
 
 1 万条目预算：约 **11 GB** 存储（只存压缩图，原图不落盘）、约 1 GB 运行时内存。
 
+**镜像由 CI 构建并推送到 GHCR**，所以部署机器上不需要源码、也不需要 `docker build`：
+
+```
+ghcr.io/pradior/personal-bookmark-web:latest
+ghcr.io/pradior/personal-bookmark-worker:latest
+```
+
+部署只要两个文件（`docker-compose.yml` + `.env.example`），详见 [docs/deploy-ugreen.md](docs/deploy-ugreen.md)。
+
+想从源码构建（改代码立刻生效 / 不依赖 GHCR）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
 ## 目录
 
 ```

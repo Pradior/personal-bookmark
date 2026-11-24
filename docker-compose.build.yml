@@ -1,0 +1,26 @@
+# 用源码构建，覆盖 docker-compose.yml 里的 image / pull_policy。
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# 给两种场景用：
+#   1. 本地开发，不想每次先从 registry 拉镜像
+#   2. 改了代码想在推 CI 之前先验证一下
+#
+# 构建出来的镜像会打在 docker-compose.yml 里声明的 image 名下
+# （ghcr.io/pradior/personal-bookmark-web:latest）。如果你不想覆盖那个标签，
+# 用 TAG=dev 跑。
+services:
+  pb-web:
+    # build 模式下不要再去 pull，否则会先拉远端 latest 再覆盖，白费流量
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: web
+
+  pb-worker:
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: worker

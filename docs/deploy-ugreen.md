@@ -10,30 +10,41 @@
 | SSH | 控制面板 → 终端机 → 启用 SSH（默认 22 端口） |
 | 目录 | 建议 `/volume1/docker/personal-bookmark` |
 | 端口 | **不要用 80 / 443**（UGOS Web UI 占用）；本文示例用 `3081` |
-| Git | 从 GitHub 部署需要 NAS 能访问 github.com |
+| 网络 | NAS 能访问 `ghcr.io`（拉镜像用，不需要访问 github.com） |
 
 > 本机 docker 需要 `sudo`。想免 sudo：`sudo usermod -aG docker $USER` 后**重新登录 SSH**。
 > 注意这等于给该账号 root 权限，多人共用别这么干。
 
-## 1. 从 GitHub 部署
+## 1. 部署（拉镜像，不需要源码）
+
+镜像由 GitHub Actions 在 main 分支上构建好并推到 GHCR，NAS 只负责拉取。
+**不需要 git、不需要 docker build，也就不用等十几分钟编译。**
+
+### 1.1 准备目录和两个文件
 
 ```bash
-cd /volume1/docker
-git clone https://github.com/Pradior/personal-bookmark.git
-cd personal-bookmark
+mkdir -p /volume1/docker/personal-bookmark && cd /volume1/docker/personal-bookmark
 ```
 
-> **NAS 访问不了 github.com 时**（国内网络常见）：给 git 配代理，
-> 例如 `git config --global http.proxy http://<代理地址>:7897`；
-> 或者在有网的机器上 clone 后整个目录拷到 NAS（`.git` 一起拷，之后仍能 pull）。
+只需要两个文件：`docker-compose.yml` 和 `.env.example`。
 
-### 1.1 建数据目录
+```bash
+BASE=https://raw.githubusercontent.com/Pradior/personal-bookmark/main
+curl -fsSL -O "$BASE/docker-compose.yml"
+curl -fsSL -O "$BASE/.env.example"
+```
+
+> 如果仓库是私有的，raw 链接也会要认证。两种办法：
+> ① 用带 token 的地址（`https://<PAT>@raw.githubusercontent.com/...`）；
+> ② 在电脑上从 GitHub 网页下载这两个文件，用 File Station 拖到 NAS。
+
+然后建数据目录：
 
 ```bash
 mkdir -p data/{db,assets,config}
 ```
 
-### 1.2 配置 .env
+### 1.2 生成 .env
 
 ```bash
 cp .env.example .env
@@ -66,27 +77,42 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 ADMIN_PASSWORD=你的密码
 ```
 
-### 1.3 启动
+### 1.3 登录 GHCR（仅私有镜像需要）
 
 ```bash
-sudo docker compose up -d --build     # 首次构建镜像，N100 上约 10–20 分钟
-sudo docker compose ps                # 三个容器都 Up，pb-web 应为 healthy
-sudo docker compose logs -f pb-web    # 看启动日志
+echo <你的PAT> | docker login ghcr.io -u <GitHub用户名> --password-stdin
+```
+
+PAT 只需要 `read:packages` 权限（fine-grained token 里勾这个即可）。
+
+> **更省事的做法**：把两个 package 设为公开。
+> GitHub → 你的头像 → Your profile → Packages → 依次点开
+> `personal-bookmark-web` / `personal-bookmark-worker` →
+> Package settings → Danger Zone → Change visibility → Public。
+> 设成公开后就不用登录了，`docker compose pull` 直接能拉。
+> 公开的只是**镜像**（编译产物），源码仓库仍然是私有的。
+
+### 1.4 启动
+
+```bash
+sudo docker compose pull      # 拉镜像（约 300MB，第一次慢）
+sudo docker compose up -d
+sudo docker compose ps        # 三个容器都 Up，pb-web 应为 healthy
+sudo docker compose logs -f pb-web
 ```
 
 首启会自动跑数据库迁移（扩展 → 表结构 → 函数索引）。
 
-### 1.4 以后更新
+### 1.5 以后更新
 
 ```bash
-sh scripts/nas-deploy.sh
+sudo docker compose pull && sudo docker compose up -d
 ```
 
-脚本会：拉最新代码 → 重建镜像 → 等 `pb-web` 变 healthy → 打印状态。
-等价于手动执行 `git pull && docker compose up -d --build`。
+或把 `scripts/nas-deploy.sh` 拷到部署目录，一条命令搞定（含健康检查等待）。
 
-> 习惯：先在 GitHub → **Actions** 看一眼那次提交是绿的，再在 NAS 上更新。
-> CI 跑的就是类型检查 + 三套自检 + 构建，绿了说明不会白等十几分钟。
+> 习惯：先在 GitHub → **Actions** 看一眼那次提交的 `images` job 是绿的，再 pull。
+> 那个 job 只有在 verify 全过之后才会跑，所以绿了说明镜像里一定是能跑的代码。
 
 ## 2. 拿管理员密码
 
@@ -204,3 +230,44 @@ sudo chown -R 1000:1000 data
 ```
 
 > 别一上来就加：PUID 填错容器会起不来，且报错很不直观。先跑通再改。
+
+## 9. 备选：从源码构建
+
+不想依赖 GHCR（比如仓库要长期私有、或想改代码立刻生效）时用这条路。
+需要 NAS 能访问 github.com。
+
+```bash
+cd /volume1/docker
+git clone https://github.com/Pradior/personal-bookmark.git
+cd personal-bookmark
+cp .env.example .env && vi .env
+mkdir -p data/{db,assets,config}
+sudo docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+`docker-compose.build.yml` 是 override 文件，它给 web/worker 补上 `build:` 段，
+并把 `pull_policy` 从 `always` 改成 `build`（否则会先白拉一次远端镜像）。
+
+以后更新：
+
+```bash
+git pull && sudo docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+**代价**：N100 上每次全量构建 10–20 分钟（依赖层有缓存时会快很多）。
+**好处**：不依赖 GHCR；改一行代码就能立刻生效，适合调抓取规则。
+
+### 仓库私有时 clone 需要凭据
+
+GitHub 已不支持密码认证，用 PAT：
+
+```bash
+git clone https://<PAT>@github.com/Pradior/personal-bookmark.git
+cd personal-bookmark
+# 别把 token 留在配置里
+git remote set-url origin https://github.com/Pradior/personal-bookmark.git
+```
+
+**NAS 访问不了 github.com 时**：给 git 配代理
+（`git config --global http.proxy http://<代理地址>:7897`，代理需允许局域网连接），
+或者在有网的电脑上 clone 后整个目录拷到 NAS（`.git` 一起拷，之后仍能 pull）。

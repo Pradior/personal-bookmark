@@ -1,21 +1,28 @@
 # ============================================================================
-#  个人bookmark —— Docker 编排
+#  个人bookmark —— Docker 编排（镜像版）
 #
-#  ── 从 GitHub 部署（推荐）──────────────────────────────────────────────
-#    git clone https://github.com/Pradior/personal-bookmark.git
-#    cd personal-bookmark
-#    cp .env.example .env && vi .env      # 填 DB_PASSWORD / AUTH_SECRET / WEB_PORT
+#  这个文件**不需要源码**，只要能拉到镜像就能跑。
+#  镜像由 GitHub Actions 在 main 分支上自动构建并推送到 GHCR。
+#
+#  ── 部署（NAS / 任意机器）────────────────────────────────────────────
+#    mkdir -p personal-bookmark && cd personal-bookmark
+#    下载本文件与 .env.example：
+#      curl -fsSL -O https://raw.githubusercontent.com/Pradior/personal-bookmark/main/docker-compose.yml
+#      curl -fsSL -O https://raw.githubusercontent.com/Pradior/personal-bookmark/main/.env.example
+#    cp .env.example .env && vi .env        # 填 DB_PASSWORD / AUTH_SECRET / WEB_PORT
 #    mkdir -p data/{db,assets,config}
-#    docker compose up -d --build
+#    docker compose up -d
 #
-#  ── 日常更新 ──────────────────────────────────────────────────────────
-#    git pull && docker compose up -d --build
-#    建议先在 GitHub → Actions 确认那次提交是绿的，再 pull。
+#    私有镜像需要先登录一次（PAT 只要 read:packages）：
+#      echo <PAT> | docker login ghcr.io -u <你的GitHub用户名> --password-stdin
 #
-#  ── 本地开发 ──────────────────────────────────────────────────────────
-#    docker compose up -d pb-db           # 只起数据库，web/worker 用 pnpm dev
+#  ── 更新 ─────────────────────────────────────────────────────────────
+#    docker compose pull && docker compose up -d
 #
-#  ── 数据 ──────────────────────────────────────────────────────────────
+#  ── 从源码构建（本地开发 / 不想用 registry）──────────────────────────
+#    docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+#  ── 数据 ─────────────────────────────────────────────────────────────
 #    全在 ./data 下：db / assets / config（含管理员密码哈希）
 #    ⚠ 删项目目录 = 连数据一起删。要保留就先把 data/ 备份出去。
 # ============================================================================
@@ -62,11 +69,9 @@ services:
 
   # ── Next.js：界面 + /api/v1 ──────────────────────────────────────────
   pb-web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: web
-    image: ${IMAGE_PREFIX:-pb}/web:${TAG:-local}
+    image: ${IMAGE_REPO:-ghcr.io/pradior}/personal-bookmark-web:${TAG:-latest}
+    # 每次 up 都去拉最新镜像；构建模式在 build override 里改成 build
+    pull_policy: ${PULL_POLICY:-always}
     container_name: pb-web
     init: true
     environment:
@@ -115,11 +120,8 @@ services:
   # ── Worker：抓取 / 转码 / 分词 / 向量 / 分类 ─────────────────────────
   # 队列用 pg-boss，表就在同一个 Postgres 里，不需要 Redis
   pb-worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: worker
-    image: ${IMAGE_PREFIX:-pb}/worker:${TAG:-local}
+    image: ${IMAGE_REPO:-ghcr.io/pradior}/personal-bookmark-worker:${TAG:-latest}
+    pull_policy: ${PULL_POLICY:-always}
     container_name: pb-worker
     init: true
     environment:
@@ -153,20 +155,21 @@ services:
 #  备注
 #
 #  1) 为什么 web / worker 的环境变量写了两遍
-#     YAML 锚点合并（<<: *app-env）在 compose v2 上能用，但在某些环境下
+#     YAML 锚点合并（<<: *app-env）在 compose v2 上能用，但某些环境下
 #     environment: 里的合并键会静默失效，排查起来很痛苦。宁可重复 6 行。
 #
-#  2) 文件权限
+#  2) 镜像来源
+#     ghcr.io/pradior/personal-bookmark-web:latest
+#     ghcr.io/pradior/personal-bookmark-worker:latest
+#     由 .github/workflows/ci.yml 的 images job 构建；每次 main 更新都会重新推。
+#     想锁版本就用 TAG=sha-xxxxxxx（CI 会打 sha- 前缀的标签）。
+#
+#  3) 文件权限
 #     默认容器以 root 运行，./data 下文件属主是 root。想让 NAS 账号可读写：
 #         id                              # 记下 uid:gid，绿联常见 1000:1000
 #         sudo chown -R 1000:1000 data
 #     然后给 pb-web / pb-worker 各加一行：user: "1000:1000"
 #     ⚠ 别一上来就加：uid 填错容器起不来，报错还很不直观。
-#
-#  3) 构建耗时
-#     N100 上首次 --build 约 10–20 分钟。之后只改业务代码，pnpm 依赖层有缓存
-#     会快很多。想彻底跳过构建：把镜像推到 registry 后，删掉 build: 段、
-#     把 image: 换成 ghcr.io/pradior/personal-bookmark-web:${TAG} 之类。
 #
 #  4) 备份
 #         docker compose exec -T pb-db pg_dump -U bookmark -Fc bookmark \
