@@ -1,0 +1,24 @@
+{
+  "name": "personal-bookmark",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.28.5",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @pb/web --filter @pb/worker dev",
+    "dev:web": "pnpm --filter @pb/web dev",
+    "dev:worker": "pnpm --filter @pb/worker dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "check": "pnpm --filter @pb/core check && pnpm --filter @pb/core check:wechat",
+    "check:compose": "node scripts/check-compose.mjs",
+    "db:generate": "pnpm --filter @pb/db generate",
+    "db:migrate": "pnpm --filter @pb/db migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "yaml": "^2.9.1"
+  }
+}

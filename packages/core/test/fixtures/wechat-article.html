@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta property="og:title" content="og 里的标题（应该被 DOM 覆盖）" />
+    <meta property="og:type" content="article" />
+    <meta property="og:image" content="https://mmbiz.qpic.cn/cover_from_og/0?wx_fmt=jpeg" />
+    <title>浏览器标题</title>
+  </head>
+  <body>
+    <h1 id="activity-name">
+      一篇用来验证解析器的测试文章
+    </h1>
+    <a id="js_name">某某研究所</a>
+    <em id="publish_time">2026-11-20</em>
+
+    <div id="js_content">
+      <p>这是第一段正文，长度要超过二十个字符，这样解析器才认为抓到了正文，而不是空页面。</p>
+
+      <p>
+        <img
+          data-src="https://mmbiz.qpic.cn/mmbiz_jpg/aaa/0?wx_fmt=jpeg&amp;from=appmsg"
+          src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E"
+          data-w="1080"
+          data-h="720"
+        />
+      </p>
+
+      <p>
+        <img data-original="https://mmbiz.qpic.cn/mmbiz_png/bbb/0?wx_fmt=png" src="data:image/gif;base64,R0lGOD" />
+      </p>
+
+      <p>
+        <img src="https://mmbiz.qpic.cn/mmbiz_jpg/ccc/0?wx_fmt=jpeg" />
+      </p>
+
+      <p>
+        <!-- 只有占位图，没有真地址 → 解析时应被删除 -->
+        <img data-src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E" src="data:image/gif;base64,R0lGOD" />
+      </p>
+
+      <script>
+        window.evil = 1;
+      </script>
+      <iframe src="https://evil.example/x"></iframe>
+      <div onclick="alert(1)">带内联事件的段落</div>
+
+      <p style="text-align: center; color: #333">这一段的 inline style 必须保留</p>
+
+      <p>
+        正文里也可能有链接，比如
+        <a href="https://example.com/somewhere">这个外链</a>
+        ，打开时必须带 rel。
+      </p>
+    </div>
+
+    <div id="js_pc_qr_code">二维码块，应该被移除</div>
+
+    <script>
+      var msg_title = '来自变量的标题（不应胜出）';
+      var nickname = '来自变量的账号名';
+      var ct = '1732000000';
+      var msg_desc = '这是页面变量里的摘要';
+      var msg_cdn_url = 'https://mmbiz.qpic.cn/cover_from_var/0?wx_fmt=jpeg';
+    </script>
+  </body>
+</html>

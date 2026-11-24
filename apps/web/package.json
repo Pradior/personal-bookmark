@@ -1,0 +1,30 @@
+{
+  "name": "@pb/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pb/contract": "workspace:*",
+    "@pb/core": "workspace:*",
+    "@pb/db": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "jose": "^5.9.6",
+    "next": "^15.1.6",
+    "pg-boss": "^10.1.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "styled-jsx": "^5.1.6",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "typescript": "^5.7.2"
+  }
+}

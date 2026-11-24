@@ -1,0 +1,19 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# ── 安装行为 ────────────────────────────────────────────
+# Next.js 会从自身位置向上解析传递依赖，pnpm 默认的隔离链接在 monorepo 下
+# 解析不到（styled-jsx、@swc/helpers 都会报 MODULE_NOT_FOUND）。
+# 应用型仓库用 hoisted 链接，换取开箱即用。
+nodeLinker: hoisted
+
+# pnpm 10+ 默认拦截依赖安装脚本，并把"有脚本被忽略"当成错误（退出码 1），
+# 这会让 Docker 里的 `pnpm install --frozen-lockfile` 直接失败。
+#   esbuild —— drizzle-kit 与 tsx 都依赖它的平台二进制
+#   sharp   —— 图片转码，安装脚本负责校验/链接预编译二进制
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+
+strictDepBuilds: false

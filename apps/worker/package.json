@@ -1,0 +1,25 @@
+{
+  "name": "@pb/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch ./src/index.ts",
+    "start": "tsx ./src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pb/core": "workspace:*",
+    "@pb/db": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "pg": "^8.13.1",
+    "pg-boss": "^10.1.5",
+    "sharp": "^0.34.5",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2"
+  }
+}
