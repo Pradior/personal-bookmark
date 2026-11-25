@@ -72,6 +72,46 @@ function isEmptyNote(note: XhsNote | null): boolean {
   return !hasText && !hasImages;
 }
 
+/**
+ * og:title 的形式是「笔记标题 - 小红书」，末尾那截要去掉，
+ * 否则列表里每条都拖着一个站名。
+ */
+function stripSiteSuffix(title: string | undefined): string | undefined {
+  if (!title) return undefined;
+  const cleaned = title.replace(/\s*[-|–]\s*小红书\s*$/u, '').trim();
+  return cleaned.length > 0 ? cleaned : title.trim();
+}
+
+/**
+ * 从原始 HTML 里捞出图片地址。
+ *
+ * 走 meta 兜底时经常没有 og:image，但页面的 preload / 内联 JSON 里
+ * 往往还散落着 xhscdn 的图片 URL —— 捞出来比一张图都没有强。
+ */
+function collectImageUrls(html: string, limit = 12): string[] {
+  const found = new Set<string>();
+  const re = /https?:\/\/[^\s"'\\<>()]+?xhscdn\.com[^\s"'\\<>()]*/gi;
+
+  for (const match of html.matchAll(re)) {
+    let url = match[0];
+    // 去掉 JSON 转义残留和末尾的标点
+    url = url.replace(/\\u002[fF]/g, '/').replace(/[),.;]+$/, '');
+    if (!/^https?:\/\//i.test(url)) continue;
+
+    // 小红书的图片地址常带处理后缀：aaa.jpg!nd_dft_wlteh_webp_3
+    // 所以判扩展名时要先切掉 ? 和 ! 之后的部分
+    const pathPart = url.split(/[?!]/, 1)[0] ?? url;
+    const looksLikeImage =
+      /\.(jpe?g|png|webp|avif|gif)$/i.test(pathPart) || /\/img\//i.test(url);
+    if (!looksLikeImage) continue;
+
+    found.add(url);
+    if (found.size >= limit) break;
+  }
+
+  return [...found];
+}
+
 export const xhsAdapter: Adapter = {
   id: 'xhs',
   priority: 90,
@@ -201,11 +241,14 @@ export const xhsAdapter: Adapter = {
     }
 
     // ── 退回 meta 兜底 ──────────────────────────────────
-    const ogTitle = metaContent($, 'meta[property="og:title"]');
+    const ogTitle = stripSiteSuffix(metaContent($, 'meta[property="og:title"]'));
     const ogDesc = metaContent($, 'meta[property="og:description"]');
     const ogImage = metaContent($, 'meta[property="og:image"]');
 
-    if (!ogTitle && !ogDesc && !ogImage) return null;
+    // og:image 常常没有，但 HTML 里可能还有别的图
+    const scraped = collectImageUrls(html);
+
+    if (!ogTitle && !ogDesc && scraped.length === 0) return null;
 
     warnings.push('只拿到了页面 meta 信息（小红书未返回笔记数据），正文可能不完整');
 
@@ -214,15 +257,35 @@ export const xhsAdapter: Adapter = {
     if (ogDesc) parts.push(`<p>${escapeHtml(ogDesc)}</p>`);
 
     const images: CaptureImage[] = [];
-    if (ogImage) {
+    // og:image 的 URL 本身也出现在 HTML 文本里，会被 collectImageUrls 再捞一次，
+    // 所以必须先按 og:image 打头、再逐个去重
+    const imageUrls: string[] = [];
+    const seenUrls = new Set<string>();
+    const pushUrl = (candidate: string | undefined): void => {
+      if (!candidate || seenUrls.has(candidate)) return;
+      seenUrls.add(candidate);
+      imageUrls.push(candidate);
+    };
+    pushUrl(ogImage);
+    for (const candidate of scraped) pushUrl(candidate);
+
+    let index = 0;
+    for (const url of imageUrls) {
+      index += 1;
+      const key = `img-${index}`;
       images.push({
-        key: 'img-1',
-        url: ogImage,
+        key,
+        url,
         referer: 'https://www.xiaohongshu.com/',
         userAgent: DESKTOP_UA,
         cookie: ctx.cookie,
       });
-      parts.push('<p><img data-pb-img="img-1" /></p>');
+      parts.push(`<p><img data-pb-img="${key}" /></p>`);
+      if (index >= 12) break;
+    }
+
+    if (images.length === 0) {
+      warnings.push('页面里没找到任何图片地址');
     }
 
     const contentHtml = parts.join('\n');
@@ -237,7 +300,7 @@ export const xhsAdapter: Adapter = {
       excerpt: ogDesc,
       contentHtml,
       contentText,
-      coverUrl: ogImage,
+      coverUrl: ogImage ?? images[0]?.url,
       coverReferer: 'https://www.xiaohongshu.com/',
       images,
       rawSnapshot: html,
@@ -256,4 +319,4 @@ function escapeHtml(input: string): string {
 }
 
 // 导出给自检脚本用（生产路径不依赖它）
-export const __internal = { findNote };
+export const __internal = { findNote, stripSiteSuffix, collectImageUrls };

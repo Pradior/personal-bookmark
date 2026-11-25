@@ -131,6 +131,38 @@ console.log('\n[空壳 note：字段全空时不算解析成功]');
   eq('空壳 note 落到 null（而不是造一条空条目）', r, null);
 }
 
+console.log('\n[meta 兜底：标题后缀与散落图片]');
+{
+  eq('去掉「 - 小红书」后缀', __internal.stripSiteSuffix('南国童话月｜已亮灯 - 小红书'), '南国童话月｜已亮灯');
+  eq('没有后缀时原样返回', __internal.stripSiteSuffix('普通标题'), '普通标题');
+  eq('空值返回 undefined', __internal.stripSiteSuffix(undefined), undefined);
+
+  const htmlNoOg = `<html><head>
+      <meta property="og:title" content="测试笔记 - 小红书" />
+      <meta property="og:description" content="只有描述没有 og:image" />
+    </head><body>
+      <img src="https://sns-webpic-qc.xhscdn.com/2026/aaa.jpg!nd_dft_wlteh_webp_3">
+      <img src="https://sns-webpic-qc.xhscdn.com/2026/bbb.webp">
+      <script src="https://fe-static.xhscdn.com/app.js"></script>
+    </body></html>`;
+
+  const scraped = __internal.collectImageUrls(htmlNoOg);
+  eq('从 HTML 里捞到 2 张图', scraped.length, 2);
+  truthy('过滤掉了 js 静态资源', !scraped.some((u) => u.includes('app.js')));
+
+  const r = await xhsAdapter.capture({
+    url: new URL('https://www.xiaohongshu.com/explore/noog'),
+    html: htmlNoOg,
+  });
+  if (!r) {
+    console.log('  FAIL 无 og:image 时不该返回 null');
+  } else {
+    eq('没有 og:image 也能有图', r.images.length, 2);
+    eq('标题后缀被去掉', r.title, '测试笔记');
+    eq('封面退到第一张图', r.coverUrl?.includes('aaa.jpg'), true);
+  }
+}
+
 console.log('\n[降级：什么都没有 → 返回 null]');
 const empty = await xhsAdapter.capture({
   url: new URL('https://www.xiaohongshu.com/explore/none'),

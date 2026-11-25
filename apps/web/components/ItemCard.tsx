@@ -57,9 +57,18 @@ export default function ItemCard({ item }: { item: ItemSummary }) {
             <div className="card-note is-error">⚠ {item.fetchError ?? '抓取失败'}</div>
           ) : processing ? (
             <div className="card-note is-working">{PROCESSING_LABEL[item.fetchState]}</div>
-          ) : item.excerpt ? (
-            <div className="card-excerpt">{item.excerpt}</div>
-          ) : null}
+          ) : (
+            <>
+              {item.excerpt ? <div className="card-excerpt">{item.excerpt}</div> : null}
+              {/* 抓取成功但有警告（例如图片没抓到、只拿到 meta）时给个提示，
+                  否则用户只会觉得"为什么没图" */}
+              {item.fetchError ? (
+                <div className="card-note subtle" title={item.fetchError}>
+                  ⚠ 内容不完整
+                </div>
+              ) : null}
+            </>
+          )}
 
           <div className="card-meta">
             <span>{SOURCE_LABEL[item.source] ?? item.source}</span>
