@@ -65,6 +65,9 @@ jobs:
       - name: 自检：抖音解析
         run: pnpm --filter @pb/core check:douyin
 
+      - name: 自检：站点凭据加解密
+        run: pnpm --filter @pb/core check:credential
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

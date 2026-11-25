@@ -20,6 +20,8 @@ const APP_SHORT = process.env.APP_SHORT ?? 'pb';
 
 const env = {
   assetsDir: process.env.ASSETS_DIR ?? './data/assets',
+  /** 解密站点凭据用；与 web 的 AUTH_SECRET 必须一致 */
+  authSecret: process.env.AUTH_SECRET ?? '',
   maxAssetBytes: Number(process.env.MAX_ASSET_BYTES ?? 20 * 1024 * 1024),
   displayMaxEdge: Number(process.env.DISPLAY_MAX_EDGE ?? 2000),
   displayQuality: Number(process.env.DISPLAY_WEBP_QUALITY ?? 85),
@@ -79,6 +81,7 @@ async function main(): Promise<void> {
       await runCapture(data, {
         db,
         assetsDir: env.assetsDir,
+        authSecret: env.authSecret,
         maxAssetBytes: env.maxAssetBytes,
         displayMaxEdge: env.displayMaxEdge,
         displayQuality: env.displayQuality,

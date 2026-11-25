@@ -354,3 +354,31 @@ export const accessToken = pgTable(
   },
   (t) => [uniqueIndex('access_token_hash_idx').on(t.tokenHash)],
 );
+
+/* ── 站点凭据：抓取时附带的 Cookie ──────────────────── *
+ *
+ * 存的是 Cookie 字符串（不是账号密码）。用途：某些站点未登录时
+ * 只返回空壳页面（小红书尤甚），带上登录态才能拿到内容。
+ *
+ * 安全性：用 AUTH_SECRET 派生密钥做 AES-256-GCM 加密后入库，
+ * 数据库被 dump 也不至于直接泄漏。但仍是敏感数据 —— 界面里只显示掩码。
+ */
+export const siteCredential = pgTable(
+  'site_credential',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** 域名，形如 xiaohongshu.com；抓取时按 host 后缀匹配 */
+    domain: varchar('domain', { length: 200 }).notNull(),
+    /** AES-256-GCM 密文，格式 iv.tag.cipher（base64url） */
+    cookieCipher: text('cookie_cipher').notNull(),
+    /** 部分站点要求 Cookie 与 UA 配套，否则会话失效 */
+    userAgent: text('user_agent'),
+    referer: text('referer'),
+    enabled: boolean('enabled').notNull().default(true),
+    note: varchar('note', { length: 200 }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('site_credential_domain_idx').on(t.domain)],
+);

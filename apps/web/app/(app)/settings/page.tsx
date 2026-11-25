@@ -1,4 +1,5 @@
 import { ping } from '@pb/db';
+import CredentialManager from '@/components/CredentialManager';
 import LogoutButton from '@/components/LogoutButton';
 import ThemeSwitch from '@/components/ThemeSwitch';
 import TokenManager from '@/components/TokenManager';
@@ -59,6 +60,23 @@ export default async function SettingsPage() {
         <Panel title="外观">
           <p className="panel-desc">三档主题：浅色 / 深色 / 护眼。选「自动」会跟随系统。</p>
           <ThemeSwitch />
+        </Panel>
+
+        <Panel
+          title="站点凭据（Cookie）"
+          desc="有些站点未登录只返回空壳页面（小红书最明显），贴一份登录后的 Cookie 才能抓到正文。用 AUTH_SECRET 加密后入库，界面里只显示长度。"
+        >
+          <CredentialManager />
+          <div className="code-block" style={{ marginTop: 16 }}>
+            <div className="code-label">怎么拿到 Cookie</div>
+            <pre>{`1. 浏览器登录该站点，打开任意一篇内容页
+2. F12 → Network → 刷新页面 → 点第一个文档请求
+3. 找到 Request Headers 里的 Cookie，整行复制
+4. 粘到上面，域名填主域（xiaohongshu.com 能匹配 www 子域）
+
+⚠ Cookie 会过期，抓不到就重新复制一次。
+⚠ 不要用账号密码：这些站点登录要短信/扫码，自动登录还会触发风控。`}</pre>
+          </div>
         </Panel>
 
         <Panel title="系统信息">

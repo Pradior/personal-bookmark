@@ -38,6 +38,7 @@ export const genericAdapter: Adapter = {
     if (!html) {
       const res = await fetchHtml(ctx.url.toString(), {
         userAgent: ctx.userAgent ?? DESKTOP_UA,
+        cookie: ctx.cookie,
         timeoutMs: ctx.timeoutMs,
         maxBytes: ctx.maxBytes,
       });
@@ -80,7 +81,7 @@ export const genericAdapter: Adapter = {
       metaContent($, 'meta[name="pubdate"]');
     const publishedAt = publishedRaw ? new Date(publishedRaw) : undefined;
 
-    const { images } = harvestImages($, $root, { referer: finalUrl });
+    const { images } = harvestImages($, $root, { referer: finalUrl, cookie: ctx.cookie });
     const contentHtml = ($root.html() ?? '').trim();
     const contentText = normalizeText($root.text());
 

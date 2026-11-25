@@ -20,6 +20,8 @@ export const WECHAT_REFERER = 'https://mp.weixin.qq.com/';
 export type FetchOptions = {
   referer?: string;
   userAgent?: string;
+  /** 站点登录态（COOKIE 头），未登录时只给空壳的站点需要它 */
+  cookie?: string;
   timeoutMs?: number;
   maxBytes?: number;
   /** 默认 2 次（首次 + 1 次重试） */
@@ -98,6 +100,7 @@ async function once(url: URL, options: FetchOptions, maxBytes: number): Promise<
       'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
     };
     if (options.referer) headers.referer = options.referer;
+    if (options.cookie) headers.cookie = options.cookie;
 
     const res = await fetch(url, { headers, redirect: 'follow', signal: controller.signal });
 

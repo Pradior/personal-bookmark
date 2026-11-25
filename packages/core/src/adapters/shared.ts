@@ -25,6 +25,7 @@ export function pickImageUrl(node: unknown): string | undefined {
 export type HarvestOptions = {
   referer?: string;
   userAgent?: string;
+  cookie?: string;
 };
 
 /**
@@ -50,7 +51,13 @@ export function harvestImages(
     }
 
     const key = `img-${index}`;
-    images.push({ key, url, referer: options.referer, userAgent: options.userAgent });
+    images.push({
+      key,
+      url,
+      referer: options.referer,
+      userAgent: options.userAgent,
+      cookie: options.cookie,
+    });
 
     const attrs = (node as AnyEl).attribs ?? {};
     const width = attrs['data-w'] ?? attrs.width;

@@ -88,6 +88,7 @@ export const xhsAdapter: Adapter = {
     if (!html) {
       const res = await fetchHtml(ctx.url.toString(), {
         userAgent: ctx.userAgent ?? DESKTOP_UA,
+        cookie: ctx.cookie,
         referer: 'https://www.xiaohongshu.com/',
         timeoutMs: ctx.timeoutMs,
         maxBytes: ctx.maxBytes,
@@ -166,6 +167,7 @@ export const xhsAdapter: Adapter = {
           url,
           referer: 'https://www.xiaohongshu.com/',
           userAgent: DESKTOP_UA,
+          cookie: ctx.cookie,
         });
         const size =
           img.width && img.height ? ` width="${img.width}" height="${img.height}"` : '';
@@ -218,6 +220,7 @@ export const xhsAdapter: Adapter = {
         url: ogImage,
         referer: 'https://www.xiaohongshu.com/',
         userAgent: DESKTOP_UA,
+        cookie: ctx.cookie,
       });
       parts.push('<p><img data-pb-img="img-1" /></p>');
     }

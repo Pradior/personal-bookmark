@@ -15,6 +15,7 @@ import {
   type ImageMap,
 } from '@pb/core';
 import { ingestImage } from '../assets';
+import { findCredential, type SiteCredential } from '../credentials';
 
 export type CaptureJobData = {
   itemId: string;
@@ -23,6 +24,8 @@ export type CaptureJobData = {
 export type CaptureEnv = {
   db: Database;
   assetsDir: string;
+  /** 用于解密站点凭据 */
+  authSecret: string;
   maxAssetBytes: number;
   displayMaxEdge: number;
   displayQuality: number;
@@ -55,9 +58,23 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
     const meta = (row.meta ?? {}) as Record<string, unknown>;
     const clientHtml = typeof meta.clientHtml === 'string' ? meta.clientHtml : undefined;
 
+    // 站点凭据（Cookie）：未登录只给空壳的站点靠它拿内容
+    const credential: SiteCredential | null = await findCredential(
+      db,
+      new URL(url).hostname,
+      env.authSecret,
+    ).catch(() => null);
+
+    if (credential) {
+      console.log(`[capture] 使用站点凭据: ${credential.domain}`);
+    }
+
     const { result, tried } = await captureWithFallback({
       url: new URL(url),
       html: clientHtml,
+      cookie: credential?.cookie,
+      userAgent: credential?.userAgent,
+      referer: credential?.referer,
     });
 
     if (!result) {
@@ -80,6 +97,7 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
         url: img.url,
         referer: img.referer,
         userAgent: img.userAgent,
+        cookie: img.cookie,
         itemId,
         assetsDir: env.assetsDir,
         maxBytes: env.maxAssetBytes,

@@ -8,6 +8,8 @@ export type CaptureImage = {
   url: string;
   referer?: string;
   userAgent?: string;
+  /** 图片同样可能需要登录态（小红书图片就校验 referer+cookie） */
+  cookie?: string;
 };
 
 export type CaptureResult = {
@@ -41,6 +43,8 @@ export type CaptureContext = {
   html?: string;
   referer?: string;
   userAgent?: string;
+  /** 该站点的登录态 Cookie（来自设置页的「站点凭据」） */
+  cookie?: string;
   timeoutMs?: number;
   maxBytes?: number;
 };

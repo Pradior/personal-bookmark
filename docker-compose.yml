@@ -130,6 +130,8 @@ services:
       APP_SHORT: ${APP_SHORT:-pb}
       ASSETS_DIR: /data/assets
       CONFIG_DIR: /data/config
+      # 解密「站点凭据」用，必须和 web 的 AUTH_SECRET 一致
+      AUTH_SECRET: ${AUTH_SECRET:?请在 .env 里设置 AUTH_SECRET}
       # N100 四核，3 足够；太大反而跟 web 抢 CPU
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-3}
       DISPLAY_MAX_EDGE: ${DISPLAY_MAX_EDGE:-2000}

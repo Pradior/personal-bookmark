@@ -35,6 +35,13 @@ export {
 } from './adapters/index';
 
 export {
+  encryptSecret,
+  decryptSecret,
+  normalizeCookie,
+  domainMatches,
+} from './credentialCrypto';
+
+export {
   sanitizeContent,
   htmlToText,
   type ImageMap,

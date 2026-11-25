@@ -17,6 +17,8 @@ export type IngestOptions = {
   url: string;
   referer?: string;
   userAgent?: string;
+  /** 站点登录态（部分图床校验 referer+cookie） */
+  cookie?: string;
   itemId: string;
   assetsDir: string;
   maxBytes: number;
@@ -56,6 +58,7 @@ export async function ingestImage(
     url,
     referer,
     userAgent,
+    cookie,
     itemId,
     assetsDir,
     maxBytes,
@@ -68,6 +71,7 @@ export async function ingestImage(
     const res = await fetchBinary(url, {
       referer,
       userAgent,
+      cookie,
       maxBytes,
       timeoutMs: 20_000,
       retries: 2,

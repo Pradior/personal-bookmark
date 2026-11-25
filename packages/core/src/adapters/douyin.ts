@@ -77,6 +77,7 @@ export const douyinAdapter: Adapter = {
     if (!html) {
       const res = await fetchHtml(ctx.url.toString(), {
         userAgent: ctx.userAgent ?? DESKTOP_UA,
+        cookie: ctx.cookie,
         referer: DOUYIN_REFERER,
         timeoutMs: ctx.timeoutMs,
         maxBytes: ctx.maxBytes,
@@ -153,7 +154,13 @@ export const douyinAdapter: Adapter = {
       }
 
       if (coverUrl) {
-        images.push({ key: 'img-1', url: coverUrl, referer: DOUYIN_REFERER, userAgent: DESKTOP_UA });
+        images.push({
+          key: 'img-1',
+          url: coverUrl,
+          referer: DOUYIN_REFERER,
+          userAgent: DESKTOP_UA,
+          cookie: ctx.cookie,
+        });
         parts.push('<p><img data-pb-img="img-1" /></p>');
       }
 
@@ -197,7 +204,13 @@ export const douyinAdapter: Adapter = {
     if (ogTitle) parts.push(`<h1>${escapeHtml(ogTitle)}</h1>`);
     if (ogDesc) parts.push(`<p>${escapeHtml(ogDesc)}</p>`);
     if (ogImage) {
-      images.push({ key: 'img-1', url: ogImage, referer: DOUYIN_REFERER, userAgent: DESKTOP_UA });
+      images.push({
+        key: 'img-1',
+        url: ogImage,
+        referer: DOUYIN_REFERER,
+        userAgent: DESKTOP_UA,
+        cookie: ctx.cookie,
+      });
       parts.push('<p><img data-pb-img="img-1" /></p>');
     }
     parts.push(`<p><a href="${escapeHtml(finalUrl)}">在原站打开这条视频</a></p>`);

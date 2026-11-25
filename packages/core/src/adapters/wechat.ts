@@ -49,6 +49,7 @@ export const wechatAdapter: Adapter = {
       const res = await fetchHtml(ctx.url.toString(), {
         referer: ctx.referer ?? WECHAT_REFERER,
         userAgent: ctx.userAgent ?? WECHAT_UA,
+        cookie: ctx.cookie,
         timeoutMs: ctx.timeoutMs,
         maxBytes: ctx.maxBytes,
       });
@@ -108,6 +109,7 @@ export const wechatAdapter: Adapter = {
     const { images } = harvestImages($, $content, {
       referer: WECHAT_REFERER,
       userAgent: WECHAT_UA,
+      cookie: ctx.cookie,
     });
 
     // 6) 正文 HTML / 纯文本
