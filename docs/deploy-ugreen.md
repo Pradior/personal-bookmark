@@ -20,6 +20,21 @@
 镜像由 GitHub Actions 在 main 分支上构建好并推到 GHCR，NAS 只负责拉取。
 **不需要 git、不需要 docker build，也就不用等十几分钟编译。**
 
+### 1.0 干净重建（可选）
+
+**彻底重来**时先删干净，但想留数据就先备份：
+
+```bash
+cd /volume1/docker
+# 想保留条目/密码就先备份，否则跳过这行
+cp -a personal-bookmark/data /volume1/docker/pb-backup-$(date +%F) 2>/dev/null || true
+rm -rf personal-bookmark
+mkdir -p personal-bookmark && cd personal-bookmark
+```
+
+> ⚠ `data/config/auth.json` 是管理员密码。删了会重新生成（打开登录页后看日志），
+> `data/db` 里的条目也会一起没。空库的话无所谓。
+
 ### 1.1 准备目录和两个文件
 
 ```bash
@@ -76,6 +91,10 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 ```ini
 ADMIN_PASSWORD=你的密码
 ```
+
+> 懒得手填密钥：如果你有完整仓库，直接 `sh scripts/nas-bootstrap.sh 3081`，
+> 它会建好 data 目录并生成带随机密钥的 `.env`（已存在则不覆盖）。
+> 没有仓库也没关系 —— 用手动命令生成两个随机值填进去即可。
 
 ### 1.3 登录 GHCR（仅私有镜像需要）
 
