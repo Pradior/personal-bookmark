@@ -66,19 +66,52 @@ console.log('\n[错误密钥 / 篡改]');
   }
   truthy('换密钥解不开（GCM 校验失败）', threw);
 }
+
+/**
+ * 注意：不能靠"改最后一个 base64 字符"来伪造篡改 ——
+ * base64url 尾字符带填充位，译码时会被丢弃，改它可能解出完全相同的字节。
+ * 密文长度随随机 IV 变化，那种写法会变成随机通过/失败的 flaky test
+ * （CI 上真的红过一次）。必须改真实字节。
+ */
 {
   const cipher = encryptSecret('secret-cookie-value', SECRET);
-  const parts = cipher.split('.');
-  // 篡改密文体最后一个字符
-  const body = parts[2] as string;
-  const tampered = `${parts[0]}.${parts[1]}.${body.slice(0, -1)}${body.endsWith('A') ? 'B' : 'A'}`;
-  let threw = false;
+  const [iv, tag, data] = cipher.split('.') as [string, string, string];
+
+  const flipFirstByte = (b64: string): string => {
+    const raw = Buffer.from(b64, 'base64url');
+    raw[0] = (raw[0] ?? 0) ^ 0xff;
+    return raw.toString('base64url');
+  };
+
+  const tamperData = `${iv}.${tag}.${flipFirstByte(data)}`;
+  let dataThrew = false;
   try {
-    decryptSecret(tampered, SECRET);
+    decryptSecret(tamperData, SECRET);
   } catch {
-    threw = true;
+    dataThrew = true;
   }
-  truthy('篡改密文会被识别出来', threw);
+  truthy('篡改密文字节会被识别（GCM tag 不匹配）', dataThrew);
+
+  const tamperTag = `${iv}.${flipFirstByte(tag)}.${data}`;
+  let tagThrew = false;
+  try {
+    decryptSecret(tamperTag, SECRET);
+  } catch {
+    tagThrew = true;
+  }
+  truthy('篡改 auth tag 会被识别', tagThrew);
+
+  const tamperIv = `${flipFirstByte(iv)}.${tag}.${data}`;
+  let ivThrew = false;
+  try {
+    decryptSecret(tamperIv, SECRET);
+  } catch {
+    ivThrew = true;
+  }
+  truthy('篡改 IV 会被识别', ivThrew);
+
+  // 反向确认：原密文一定能解开，排除"全都解不开"的假阳性
+  eq('原密文仍可正常解密', decryptSecret(cipher, SECRET), 'secret-cookie-value');
 }
 {
   let threw = false;
