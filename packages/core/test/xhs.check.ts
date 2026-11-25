@@ -103,6 +103,34 @@ eq('走的是 meta 路径', meta.meta.via, 'meta');
 eq('图片只有封面 1 张', meta.images.length, 1);
 truthy('有降级提示', meta.warnings.some((w) => w.includes('meta')));
 
+console.log('\n[登录墙：明确报错，不落成空卡片]');
+{
+  const loginWallHtml =
+    '<html><body><div>登录后查看笔记</div><div>扫码登录小红书</div></body></html>';
+  let thrown = '';
+  try {
+    await xhsAdapter.capture({
+      url: new URL('https://www.xiaohongshu.com/explore/login'),
+      html: loginWallHtml,
+    });
+  } catch (err) {
+    thrown = (err as Error).message;
+  }
+  truthy('抛出了 blocked 错误', thrown.includes('需要登录'));
+}
+
+console.log('\n[空壳 note：字段全空时不算解析成功]');
+{
+  const emptyNoteHtml = `<html><body>
+    <script>window.__INITIAL_STATE__ = {"note":{"noteDetailMap":{"x":{"note":{"title":"","desc":"","imageList":[]}}}}};</script>
+  </body></html>`;
+  const r = await xhsAdapter.capture({
+    url: new URL('https://www.xiaohongshu.com/explore/empty'),
+    html: emptyNoteHtml,
+  });
+  eq('空壳 note 落到 null（而不是造一条空条目）', r, null);
+}
+
 console.log('\n[降级：什么都没有 → 返回 null]');
 const empty = await xhsAdapter.capture({
   url: new URL('https://www.xiaohongshu.com/explore/none'),

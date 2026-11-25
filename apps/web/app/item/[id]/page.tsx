@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import ReaderFrame from '@/components/ReaderFrame';
+import RetryButton from '@/components/RetryButton';
 import { authenticate } from '@/lib/session';
 import { getItem } from '@/lib/items';
 
@@ -53,11 +54,14 @@ export default async function ReaderPage({ params }: Props) {
 
       {row.fetchState === 'failed' ? (
         <div className="banner is-warn" style={{ margin: '0 0 16px' }}>
-          <div>
-            <strong>只保存了链接。</strong>
-            {row.fetchError ? ` ${row.fetchError}` : ' 正文没能抓下来。'}
-            <br />
-            你仍然可以点右上角「原文 ↗」在浏览器里阅读。
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <strong>只保存了链接。</strong>
+              {row.fetchError ? ` ${row.fetchError}` : ' 正文没能抓下来。'}
+              <br />
+              也可以点右上角「原文 ↗」在浏览器里阅读。
+            </div>
+            <RetryButton itemId={row.id} />
           </div>
         </div>
       ) : row.fetchState !== 'done' ? (

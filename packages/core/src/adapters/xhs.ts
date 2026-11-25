@@ -49,6 +49,29 @@ function findNote(state: unknown): XhsNote | null {
   return null;
 }
 
+/** 小红书未登录时会给一个只有壳的页面，这些文案是它的特征 */
+const LOGIN_WALL_SIGNALS = [
+  '登录后查看',
+  '登录后可查看',
+  '请先登录',
+  '扫码登录',
+  '打开小红书App',
+  'sns-login',
+];
+
+function hasLoginWall(html: string): boolean {
+  const head = html.slice(0, 200_000);
+  return LOGIN_WALL_SIGNALS.some((s) => head.includes(s));
+}
+
+/** note 对象存在但字段全空 —— 和没解析到一样，不能当成功 */
+function isEmptyNote(note: XhsNote | null): boolean {
+  if (!note) return false;
+  const hasText = Boolean(note.title?.trim() || note.desc?.trim());
+  const hasImages = (note.imageList ?? []).some((i) => i?.urlDefault || i?.urlPre);
+  return !hasText && !hasImages;
+}
+
 export const xhsAdapter: Adapter = {
   id: 'xhs',
   priority: 90,
@@ -97,6 +120,21 @@ export const xhsAdapter: Adapter = {
       } catch {
         warnings.push('页面里的 __INITIAL_STATE__ 解析失败，已退回 meta 兜底');
       }
+    }
+
+    // 拿到 note 但字段全空，等价于没拿到（未登录时常见）
+    if (isEmptyNote(note)) {
+      warnings.push('页面里的 note 是空壳（没有标题、正文和图片）');
+      note = null;
+    }
+
+    // 没有笔记数据 + 页面出现登录提示 → 明确告诉用户原因，
+    // 别让 generic 去抽一段登录文案，最后存成一张"无标题"的空卡片
+    if (!note && hasLoginWall(html)) {
+      throw new FetchError(
+        '小红书需要登录才能查看笔记正文（服务端拿不到数据）。请用浏览器打开后用扩展保存，或把正文复制粘贴过来。',
+        'blocked',
+      );
     }
 
     // ── 有完整 note：自己拼正文 ──────────────────────────

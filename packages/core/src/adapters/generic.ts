@@ -84,7 +84,13 @@ export const genericAdapter: Adapter = {
     const contentHtml = ($root.html() ?? '').trim();
     const contentText = normalizeText($root.text());
 
-    if (contentText.length < 20) return null;
+    // 质量门槛：太短的大概率不是正文，而是登录墙 / 验证页 / 导航条。
+    // 宁可返回 null 让上层记成"仅保存了链接"，也不要存一张空卡片。
+    const hasTitle = Boolean(title);
+    const tooShort = hasTitle ? contentText.length < 60 : contentText.length < 150;
+    if (tooShort) {
+      return null;
+    }
 
     return {
       type: 'article',
