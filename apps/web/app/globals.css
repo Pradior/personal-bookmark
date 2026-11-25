@@ -56,18 +56,19 @@
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.12);
 
   /* ── 玻璃拟态（只用于导航与浮层，见下方 .glass 说明） ── */
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-bg-strong: rgba(255, 255, 255, 0.86);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  --glass-blur: 18px;
-  --glass-saturate: 1.35;
-  --glass-shadow: 0 8px 28px rgba(28, 27, 25, 0.1);
+  --glass-bg: rgba(255, 255, 255, 0.46);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  /* 1px 内高光：没有它，半透明面板就只是"色块" */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-blur: 16px;
+  --glass-saturate: 1.8;
+  --glass-shadow: 0 8px 28px rgba(28, 27, 25, 0.12);
 
   /* 背景光斑：玻璃必须"背后有东西"才看得出效果 */
-  --blob-1: rgba(15, 118, 110, 0.16);
-  --blob-2: rgba(129, 140, 248, 0.14);
-  --blob-3: rgba(244, 164, 96, 0.12);
+  --blob-1: rgba(15, 118, 110, 0.28);
+  --blob-2: rgba(99, 102, 241, 0.26);
+  --blob-3: rgba(244, 114, 82, 0.22);
 
   color-scheme: light;
 }
@@ -95,17 +96,17 @@
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.6);
 
   /* 深色下玻璃用"白光薄涂"而不是白色半透明，否则会发灰 */
-  --glass-bg: rgba(38, 37, 33, 0.55);
-  --glass-bg-strong: rgba(38, 37, 33, 0.82);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --glass-blur: 20px;
-  --glass-saturate: 1.2;
-  --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --glass-bg: rgba(38, 37, 33, 0.42);
+  --glass-bg-strong: rgba(38, 37, 33, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --glass-blur: 18px;
+  --glass-saturate: 1.6;
+  --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 
-  --blob-1: rgba(45, 212, 191, 0.14);
-  --blob-2: rgba(129, 140, 248, 0.13);
-  --blob-3: rgba(251, 146, 60, 0.1);
+  --blob-1: rgba(45, 212, 191, 0.22);
+  --blob-2: rgba(129, 140, 248, 0.2);
+  --blob-3: rgba(251, 146, 60, 0.16);
 
   color-scheme: dark;
 }
@@ -133,17 +134,17 @@
   --shadow-pop: 0 8px 24px rgba(80, 70, 50, 0.16);
 
   /* 护眼主题的玻璃偏米色，不要用纯白（会显得脏） */
-  --glass-bg: rgba(255, 253, 247, 0.66);
-  --glass-bg-strong: rgba(255, 253, 247, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  --glass-blur: 18px;
-  --glass-saturate: 1.25;
-  --glass-shadow: 0 8px 28px rgba(80, 70, 50, 0.14);
+  --glass-bg: rgba(255, 253, 247, 0.5);
+  --glass-bg-strong: rgba(255, 253, 247, 0.84);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-blur: 16px;
+  --glass-saturate: 1.7;
+  --glass-shadow: 0 8px 28px rgba(80, 70, 50, 0.16);
 
-  --blob-1: rgba(20, 105, 95, 0.14);
-  --blob-2: rgba(160, 140, 200, 0.12);
-  --blob-3: rgba(200, 150, 90, 0.12);
+  --blob-1: rgba(20, 105, 95, 0.24);
+  --blob-2: rgba(160, 140, 200, 0.2);
+  --blob-3: rgba(200, 150, 90, 0.18);
 
   color-scheme: light;
 }
@@ -211,6 +212,20 @@ body::before {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+
+/**
+ * 颗粒：深色主题下大面积渐变会出现色带（banding），
+ * 一层 3.5% 的噪点就能压住。只叠在深色，浅色底加噪点会显脏。
+ */
+[data-theme='dark'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* 系统级的"减少透明度"偏好要尊重 */
@@ -286,6 +301,10 @@ button {
   background: var(--accent);
   border-color: transparent;
   color: var(--accent-fg);
+  /* 只在这里加一道顶部镜面高光：整页铺开会糊，一处刚好 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .btn-primary:hover {
@@ -373,6 +392,7 @@ button {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-highlight);
   padding: var(--space-3);
   gap: var(--space-2);
 }
@@ -542,6 +562,7 @@ button {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-highlight);
   flex: none;
 }
 
@@ -1100,6 +1121,7 @@ button {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-highlight);
 }
 
 .reader-head {
