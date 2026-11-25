@@ -215,6 +215,7 @@ sudo docker compose down                  # 停止（保留数据）
 | 卡片显示「触发人机验证」 | 该 IP 抓公众号被拦 | 见下节 |
 | 卡片一直「正在抓取」 | worker 异常 | `sudo docker compose logs pb-worker` |
 | `pb-web` 反复重启 | 迁移失败 | 看日志里 migrate 的输出，确认 `DATABASE_URL` 与 pb-db 健康 |
+| `pull` 报 `registry-1.docker.io`: EOF | Docker Hub 连不上（pb-db 镜像来自那里） | 只拉应用镜像：`docker compose pull pb-web pb-worker`；或在 UGOS Docker → 设置 → 加速器 配镜像源。compose 里 `pb-db` 已设 `pull_policy: missing`，正常情况下不会再碰它 |
 
 ### 关于公众号抓取被拦
 

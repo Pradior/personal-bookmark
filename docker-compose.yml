@@ -41,6 +41,11 @@ services:
   # 不映射宿主端口：只在 compose 内部网络可达，少一个攻击面
   pb-db:
     image: pgvector/pgvector:pg16
+    # 数据库镜像只在缺失时拉取：
+    #   1. 它来自 Docker Hub，国内经常连不上（registry-1.docker.io EOF），
+    #      而一旦报错会中断整个 compose pull，连累应用镜像也拉不下来
+    #   2. 数据库镜像本来就不该跟着应用一起升级，要升就显式改版本号
+    pull_policy: missing
     container_name: pb-db
     environment:
       POSTGRES_DB: bookmark
