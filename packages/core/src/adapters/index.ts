@@ -3,10 +3,11 @@ import { FetchError } from '../fetcher';
 import type { Adapter, CaptureContext, CaptureResult } from './types';
 import { wechatAdapter } from './wechat';
 import { xhsAdapter } from './xhs';
+import { douyinAdapter } from './douyin';
 import { genericAdapter } from './generic';
 
 /** priority 降序；generic 永远兜底 */
-export const adapters: Adapter[] = [wechatAdapter, xhsAdapter, genericAdapter].sort(
+export const adapters: Adapter[] = [wechatAdapter, xhsAdapter, douyinAdapter, genericAdapter].sort(
   (a, b) => b.priority - a.priority,
 );
 
@@ -44,6 +45,6 @@ export async function captureWithFallback(
   return { result: null, tried };
 }
 
-export { wechatAdapter, xhsAdapter, genericAdapter };
+export { wechatAdapter, xhsAdapter, douyinAdapter, genericAdapter };
 export type { Adapter, CaptureContext, CaptureResult };
 export * from './types';

@@ -11,50 +11,7 @@
 import * as cheerio from 'cheerio';
 import { detectBlock, fetchHtml, FetchError, DESKTOP_UA } from '../fetcher';
 import type { Adapter, CaptureContext, CaptureImage, CaptureResult } from './types';
-import { metaContent, normalizeText } from './shared';
-
-/** 从 marker 之后找第一个配平的 JSON 对象（字符串里的花括号不能算） */
-function extractJsonObject(html: string, marker: string): string | null {
-  const markerIdx = html.indexOf(marker);
-  if (markerIdx < 0) return null;
-
-  const start = html.indexOf('{', markerIdx);
-  if (start < 0) return null;
-
-  let depth = 0;
-  let inString = false;
-  let quote = '';
-  let escaped = false;
-
-  for (let i = start; i < html.length; i += 1) {
-    const ch = html.charAt(i);
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (ch === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (ch === quote) inString = false;
-      continue;
-    }
-
-    if (ch === '"' || ch === "'") {
-      inString = true;
-      quote = ch;
-      continue;
-    }
-    if (ch === '{') depth += 1;
-    if (ch === '}') {
-      depth -= 1;
-      if (depth === 0) return html.slice(start, i + 1);
-    }
-  }
-  return null;
-}
+import { extractJsonObject, metaContent, normalizeText } from './shared';
 
 type XhsNote = {
   title?: string;
@@ -258,4 +215,4 @@ function escapeHtml(input: string): string {
 }
 
 // 导出给自检脚本用（生产路径不依赖它）
-export const __internal = { extractJsonObject, findNote };
+export const __internal = { findNote };

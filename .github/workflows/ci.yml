@@ -62,6 +62,9 @@ jobs:
       - name: 自检：小红书解析
         run: pnpm --filter @pb/core check:xhs
 
+      - name: 自检：抖音解析
+        run: pnpm --filter @pb/core check:douyin
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

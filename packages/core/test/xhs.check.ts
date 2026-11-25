@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { xhsAdapter, __internal } from '../src/adapters/xhs.ts';
+import { extractJsonObject } from '../src/adapters/shared.ts';
 import { pickAdapter } from '../src/adapters/index.ts';
 import { sanitizeContent } from '../src/sanitize.ts';
 
@@ -49,7 +50,7 @@ eq('公众号不会误判为 xhs', pickAdapter(new URL('https://mp.weixin.qq.com
 
 console.log('\n[JSON 提取：字符串里的花括号不能打断配平]');
 {
-  const raw = __internal.extractJsonObject(noteHtml, 'window.__INITIAL_STATE__');
+  const raw = extractJsonObject(noteHtml, 'window.__INITIAL_STATE__');
   truthy('提取到了对象', typeof raw === 'string' && raw.startsWith('{') && raw.endsWith('}'));
   truthy('包含花括号的字符串没被截断', raw?.includes('花括号') ?? false);
 }

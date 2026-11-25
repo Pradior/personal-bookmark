@@ -79,3 +79,99 @@ export function metaContent($: cheerio.CheerioAPI, selector: string): string | u
   const v = $(selector).attr('content')?.trim();
   return v && v.length > 0 ? v : undefined;
 }
+
+/**
+ * 从 marker 之后找第一个配平的 JSON 对象。
+ * 字符串里的花括号不算数，所以不能用正则一把梭。
+ */
+export function extractJsonObject(html: string, marker: string): string | null {
+  const markerIdx = html.indexOf(marker);
+  if (markerIdx < 0) return null;
+
+  const start = html.indexOf('{', markerIdx);
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let quote = '';
+  let escaped = false;
+
+  for (let i = start; i < html.length; i += 1) {
+    const ch = html.charAt(i);
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch === quote) inString = false;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      quote = ch;
+      continue;
+    }
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return html.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * 深度遍历 JSON 找第一个满足条件的对象。
+ * 抖音/小红书的 state 层级随版本变化，写死路径非常脆，按特征找更稳。
+ */
+export function deepFind(
+  root: unknown,
+  predicate: (node: Record<string, unknown>) => boolean,
+  maxDepth = 14,
+): Record<string, unknown> | null {
+  const queue: Array<{ node: unknown; depth: number }> = [{ node: root, depth: 0 }];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) break;
+    const { node, depth } = current;
+    if (depth > maxDepth || node === null || typeof node !== 'object') continue;
+
+    if (Array.isArray(node)) {
+      for (const item of node) queue.push({ node: item, depth: depth + 1 });
+      continue;
+    }
+
+    const record = node as Record<string, unknown>;
+    try {
+      if (predicate(record)) return record;
+    } catch {
+      /* predicate 抛错就当不匹配 */
+    }
+
+    for (const value of Object.values(record)) {
+      if (value && typeof value === 'object') {
+        queue.push({ node: value, depth: depth + 1 });
+      }
+    }
+  }
+
+  return null;
+}
+
+/** 把抖音常见的 `//p3-sign.douyinpic.com/...` 补成完整 URL */
+export function ensureProtocol(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (!/^https?:\/\//i.test(trimmed)) return undefined;
+  return trimmed;
+}
+
