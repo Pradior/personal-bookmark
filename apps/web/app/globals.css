@@ -55,6 +55,20 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.12);
 
+  /* ── 玻璃拟态（只用于导航与浮层，见下方 .glass 说明） ── */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-blur: 18px;
+  --glass-saturate: 1.35;
+  --glass-shadow: 0 8px 28px rgba(28, 27, 25, 0.1);
+
+  /* 背景光斑：玻璃必须"背后有东西"才看得出效果 */
+  --blob-1: rgba(15, 118, 110, 0.16);
+  --blob-2: rgba(129, 140, 248, 0.14);
+  --blob-3: rgba(244, 164, 96, 0.12);
+
   color-scheme: light;
 }
 
@@ -79,6 +93,19 @@
   --warn: #fdb022;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+  /* 深色下玻璃用"白光薄涂"而不是白色半透明，否则会发灰 */
+  --glass-bg: rgba(38, 37, 33, 0.55);
+  --glass-bg-strong: rgba(38, 37, 33, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+  --glass-saturate: 1.2;
+  --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+
+  --blob-1: rgba(45, 212, 191, 0.14);
+  --blob-2: rgba(129, 140, 248, 0.13);
+  --blob-3: rgba(251, 146, 60, 0.1);
 
   color-scheme: dark;
 }
@@ -105,6 +132,19 @@
   --shadow-card: 0 1px 2px rgba(80, 70, 50, 0.08);
   --shadow-pop: 0 8px 24px rgba(80, 70, 50, 0.16);
 
+  /* 护眼主题的玻璃偏米色，不要用纯白（会显得脏） */
+  --glass-bg: rgba(255, 253, 247, 0.66);
+  --glass-bg-strong: rgba(255, 253, 247, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --glass-blur: 18px;
+  --glass-saturate: 1.25;
+  --glass-shadow: 0 8px 28px rgba(80, 70, 50, 0.14);
+
+  --blob-1: rgba(20, 105, 95, 0.14);
+  --blob-2: rgba(160, 140, 200, 0.12);
+  --blob-3: rgba(200, 150, 90, 0.12);
+
   color-scheme: light;
 }
 
@@ -130,6 +170,63 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/**
+ * 背景光斑层 —— 玻璃拟态的前提。
+ * 没有它，半透明模糊的元素底下什么都没有，看起来只是"灰卡片"。
+ * inset 取负值是为了让模糊边缘不露出直角。
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 14% 6%, var(--blob-1), transparent 70%),
+    radial-gradient(38% 34% at 86% 10%, var(--blob-2), transparent 72%),
+    radial-gradient(52% 44% at 52% 98%, var(--blob-3), transparent 70%);
+  filter: blur(8px);
+}
+
+/* 玻璃层：只用于导航与浮层（见 SPEC §9.6 的适用范围） */
+.glass-surface {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-highlight);
+}
+
+/* 浏览器不支持 backdrop-filter 时退回不透明，别让内容糊在背景上 */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .sidebar,
+  .topbar,
+  .reader-topbar,
+  .savebox,
+  .lightbox-bar {
+    background: var(--bg-elev);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* 系统级的"减少透明度"偏好要尊重 */
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .topbar,
+  .reader-topbar,
+  .savebox,
+  .lightbox-bar {
+    background: var(--bg-elev);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  body::before {
+    display: none;
+  }
 }
 
 a {
@@ -273,7 +370,9 @@ button {
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--border);
-  background: var(--bg-sunken);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   padding: var(--space-3);
   gap: var(--space-2);
 }
@@ -430,7 +529,7 @@ button {
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--border);
-  background: var(--bg);
+  background: transparent;
 }
 
 .topbar {
@@ -440,7 +539,9 @@ button {
   height: var(--topbar-h);
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   flex: none;
 }
 
@@ -590,7 +691,7 @@ button {
   display: none;
   flex-direction: column;
   min-width: 0;
-  background: var(--bg);
+  background: transparent;
 }
 
 @media (min-width: 1280px) {
@@ -642,9 +743,11 @@ button {
 .theme-switch {
   display: inline-flex;
   padding: 2px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  background: var(--bg-sunken);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(12px) saturate(var(--glass-saturate));
   gap: 2px;
 }
 
@@ -925,6 +1028,13 @@ button {
 /* ── 粘贴保存框 ─────────────────────────────────────── */
 .savebox {
   margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
 }
 
 .savebox-row {
@@ -975,7 +1085,7 @@ button {
 .reader-page {
   min-height: 100dvh;
   padding-bottom: 64px;
-  background: var(--bg);
+  background: transparent;
 }
 
 .reader-topbar {
@@ -987,7 +1097,9 @@ button {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 
 .reader-head {
@@ -1059,6 +1171,12 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  background: rgba(28, 27, 25, 0.45);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
 }
 
 .lightbox-error {
