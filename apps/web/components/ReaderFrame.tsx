@@ -9,6 +9,14 @@ type Lightbox = {
   height?: number;
 };
 
+type Props = {
+  html: string;
+  /** 正文基准字号（px） */
+  fontSize?: number;
+  /** 行高倍率 */
+  lineHeight?: number;
+};
+
 /**
  * 阅读页正文渲染（SPEC §8.1 / §8.2）
  *
@@ -16,17 +24,32 @@ type Lightbox = {
  * - sandbox="allow-same-origin"：不给 allow-scripts，所以正文里的脚本无法执行；
  *   但同源能让父页面给图片绑点击事件、并让图片请求带上登录 cookie
  * - 点图片 → 全屏 lightbox → 下侧「预览原图」按需回源（ADR-013）
+ *
+ * 字号/行高通过**直接改 iframe 文档的 CSS 变量**来生效，而不是重建 srcDoc ——
+ * 重建会让 iframe 重新加载，阅读位置和图片都得重来。
  */
-export default function ReaderFrame({ html }: { html: string }) {
+export default function ReaderFrame({ html, fontSize = 18, lineHeight = 1.85 }: Props) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [box, setBox] = useState<Lightbox | null>(null);
   const [sourceShown, setSourceShown] = useState(false);
   const [sourceLoading, setSourceLoading] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);
 
+  // 字号/行高变化时只改样式，不重载内容
+  useEffect(() => {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc?.documentElement) return;
+    doc.documentElement.style.setProperty('--pb-font-size', `${fontSize}px`);
+    doc.documentElement.style.setProperty('--pb-line-height', String(lineHeight));
+  }, [fontSize, lineHeight]);
+
   const onFrameLoad = useCallback(() => {
     const doc = frameRef.current?.contentDocument;
     if (!doc) return;
+
+    // 恢复字号/行高（srcDoc 首次加载后要再设一次）
+    doc.documentElement?.style.setProperty('--pb-font-size', `${fontSize}px`);
+    doc.documentElement?.style.setProperty('--pb-line-height', String(lineHeight));
 
     // iframe 里没有脚本，所以高度由父页面算：内容多高、框就多高，
     // 避免出现"页面里再套一层滚动条"
@@ -62,7 +85,7 @@ export default function ReaderFrame({ html }: { html: string }) {
         setSourceLoading(false);
       });
     });
-  }, []);
+  }, [fontSize, lineHeight]);
 
   const close = useCallback(() => {
     setBox(null);
@@ -155,8 +178,8 @@ function buildDoc(html: string): string {
     margin: 0;
     padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
-    font-size: 18px;
-    line-height: 1.85;
+    font-size: var(--pb-font-size, 18px);
+    line-height: var(--pb-line-height, 1.85);
     color: #1c1b19;
     background: transparent;
     word-break: break-word;

@@ -1,5 +1,6 @@
 import AutoRefresh from '@/components/AutoRefresh';
 import EmptyState from '@/components/EmptyState';
+import InboxKeyboard from '@/components/InboxKeyboard';
 import ItemCard from '@/components/ItemCard';
 import ListPage from '@/components/ListPage';
 import SaveBox from '@/components/SaveBox';
@@ -15,6 +16,7 @@ export default async function InboxPage() {
   return (
     <ListPage title="收件箱" dbReady={items !== null}>
       <AutoRefresh active={hasProcessing(list)} />
+      <InboxKeyboard itemCount={list.length} />
       <SaveBox />
       {list.length > 0 ? (
         <div className="cards">

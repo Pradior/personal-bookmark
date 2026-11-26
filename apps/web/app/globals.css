@@ -1326,3 +1326,150 @@ button {
     display: none;
   }
 }
+
+/* ── 阅读：进度条 / 排版浮条 / 翻页 ─────────────────── */
+
+.read-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 70;
+  background: transparent;
+  pointer-events: none;
+}
+
+.read-progress-bar {
+  height: 100%;
+  transform-origin: 0 50%;
+  background: var(--accent);
+  opacity: 0.85;
+  transition: transform 80ms linear;
+}
+
+.reader-nav {
+  display: flex;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.reader-fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  box-shadow: var(--shadow-pop), var(--glass-highlight);
+  opacity: 0.55;
+  transition: opacity 140ms ease;
+}
+
+.reader-fab:hover,
+.reader-fab:focus-within {
+  opacity: 1;
+}
+
+.reader-fab .btn {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.reader-fab-value {
+  min-width: 20px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 收件箱键盘流 ──────────────────────────────────── */
+
+.card-link.is-focused .card {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft, rgba(15, 118, 110, 0.18));
+}
+
+.kbd-hint {
+  margin: 0 0 var(--space-2);
+  font-size: 12px;
+}
+
+.kbd-hint kbd,
+.kbd-help kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--bg-elev);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  text-align: center;
+  color: var(--fg);
+}
+
+.kbd-help {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(20, 19, 17, 0.45);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.kbd-help-panel {
+  width: min(420px, 100%);
+  padding: var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-pop);
+}
+
+.kbd-help-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.kbd-help-head strong {
+  flex: 1;
+  font-size: 14px;
+}
+
+.kbd-help dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.kbd-help dl > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.kbd-help dt {
+  min-width: 72px;
+}
+
+.kbd-help dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-2, var(--fg));
+}

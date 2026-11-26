@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import ReaderFrame from '@/components/ReaderFrame';
+import ReaderBody from '@/components/ReaderBody';
 import RetryButton from '@/components/RetryButton';
 import { authenticate } from '@/lib/session';
-import { getItem } from '@/lib/items';
+import { getItem, getNeighbors } from '@/lib/items';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +20,14 @@ export default async function ReaderPage({ params }: Props) {
 
   const row = await getItem(id).catch(() => null);
   if (!row) notFound();
+
+  // 前后邻居：列表顺序 = savedAt DESC，给 J/K 翻页用
+  const neighbors = await getNeighbors(id).catch(() => ({
+    prevId: null,
+    nextId: null,
+    prevTitle: null,
+    nextTitle: null,
+  }));
 
   const published = row.publishedAt
     ? `${row.publishedAt.getFullYear()}-${String(row.publishedAt.getMonth() + 1).padStart(2, '0')}-${String(
@@ -40,6 +48,26 @@ export default async function ReaderPage({ params }: Props) {
         <div className="reader-head" style={{ flex: 1, minWidth: 0 }}>
           <h1 className="reader-title">{row.title ?? '（无标题）'}</h1>
           {metaLine ? <div className="reader-meta">{metaLine}</div> : null}
+        </div>
+        <div className="reader-nav">
+          {neighbors.prevId ? (
+            <Link
+              href={`/item/${neighbors.prevId}`}
+              className="btn btn-ghost"
+              title={neighbors.prevTitle ?? '上一篇'}
+            >
+              ↑ 上一篇
+            </Link>
+          ) : null}
+          {neighbors.nextId ? (
+            <Link
+              href={`/item/${neighbors.nextId}`}
+              className="btn btn-ghost"
+              title={neighbors.nextTitle ?? '下一篇'}
+            >
+              下一篇 ↓
+            </Link>
+          ) : null}
         </div>
         {/* 速记没有来源链接，就不显示「原文 ↗」 */}
         {row.url ? (
@@ -88,13 +116,21 @@ export default async function ReaderPage({ params }: Props) {
         </div>
       ) : null}
 
-      <div className="reader-body">
-        {row.contentHtml ? (
-          <ReaderFrame html={row.contentHtml} />
-        ) : (
+      {row.contentHtml ? (
+        <ReaderBody
+          itemId={row.id}
+          html={row.contentHtml}
+          prevId={neighbors.prevId}
+          nextId={neighbors.nextId}
+          prevTitle={neighbors.prevTitle}
+          nextTitle={neighbors.nextTitle}
+          sourceUrl={row.url}
+        />
+      ) : (
+        <div className="reader-body">
           <p className="subtle">还没有正文内容。</p>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
 }

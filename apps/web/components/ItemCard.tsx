@@ -37,7 +37,13 @@ export default function ItemCard({ item }: { item: ItemSummary }) {
   const read = item.status === 'archived';
 
   return (
-    <Link href={`/item/${item.id}`} className="card-link">
+    <Link
+      href={`/item/${item.id}`}
+      className="card-link"
+      // 键盘流（InboxKeyboard）据此定位卡片、取原文地址
+      data-item-id={item.id}
+      data-item-url={item.url ?? ''}
+    >
       <article className="card">
         <div className="card-cover">
           {item.coverAssetId ? (
