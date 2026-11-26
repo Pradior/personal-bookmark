@@ -12,10 +12,11 @@
     "dev:worker": "pnpm --filter @pb/worker dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "check": "node --experimental-strip-types packages/core/test/url.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/wechat.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/xhs.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/douyin.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/credential.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/hints.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/image.check.ts && node node_modules/tsx/dist/cli.mjs scripts/check-queries.mts",
+    "check": "node --experimental-strip-types packages/core/test/url.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/wechat.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/xhs.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/douyin.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/credential.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/hints.check.ts && node node_modules/tsx/dist/cli.mjs packages/core/test/image.check.ts && node node_modules/tsx/dist/cli.mjs scripts/check-queries.mts && node node_modules/tsx/dist/cli.mjs scripts/check-auth.mts",
     "check:compose": "node scripts/check-compose.mjs",
     "check:ext": "node scripts/check-extension.mjs",
-    "check:queries": "node node_modules/tsx/dist/cli.mjs scripts/check-queries.mts",
+    "check:queries": "node node_modules/tsx/dist/cli.mjs scripts/check-queries.mts && node node_modules/tsx/dist/cli.mjs scripts/check-auth.mts",
+    "check:auth": "node node_modules/tsx/dist/cli.mjs scripts/check-auth.mts",
     "db:generate": "pnpm --filter @pb/db generate",
     "db:migrate": "pnpm --filter @pb/db migrate"
   },

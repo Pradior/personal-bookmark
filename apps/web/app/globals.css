@@ -1925,3 +1925,27 @@ button {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft, rgba(15, 118, 110, 0.16));
 }
+
+/* ── 修改密码表单 ───────────────────────────────────── */
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 360px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.field .input {
+  width: 100%;
+}

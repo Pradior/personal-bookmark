@@ -1,6 +1,7 @@
 import { ping } from '@pb/db';
 import CredentialManager from '@/components/CredentialManager';
 import LogoutButton from '@/components/LogoutButton';
+import PasswordManager from '@/components/PasswordManager';
 import ThemeSwitch from '@/components/ThemeSwitch';
 import TokenManager from '@/components/TokenManager';
 import { APP_VERSION, env } from '@/lib/env';
@@ -43,6 +44,10 @@ export default async function SettingsPage() {
           <div style={{ marginTop: 12 }}>
             <LogoutButton />
           </div>
+        </Panel>
+
+        <Panel title="登录密码" desc="修改管理员密码。改完所有设备都会退出登录。">
+          <PasswordManager />
         </Panel>
 
         <Panel

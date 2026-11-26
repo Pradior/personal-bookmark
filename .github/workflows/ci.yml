@@ -77,6 +77,9 @@ jobs:
       - name: 自检：关键 SQL 片段
         run: pnpm check:queries
 
+      - name: 自检：密码与会话代次
+        run: pnpm check:auth
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

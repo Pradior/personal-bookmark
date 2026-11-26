@@ -7,7 +7,7 @@
  *   2. 会话 JWT —— jose 的 HS256，HttpOnly cookie
  *   3. PAT —— 32 字节随机，库里只存 SHA-256 与前缀
  */
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
@@ -66,6 +66,13 @@ export type AuthFile = {
   version: 1;
   passwordHash: string;
   createdAt: string;
+  /**
+   * 会话代次。改密码时 +1，所有旧 cookie 立即失效。
+   *
+   * 没有它的话：改密码只换了登录凭据，已经签发的 JWT 还能用 30 天 ——
+   * 而改密码最常见的动机恰恰是怀疑 cookie 泄露。
+   */
+  sessionEpoch?: number;
 };
 
 let cachedAuth: AuthFile | null = null;
@@ -115,6 +122,8 @@ export async function getAuthFile(): Promise<AuthFile> {
     version: 1,
     passwordHash: hashPassword(password),
     createdAt: new Date().toISOString(),
+    // 首启就用随机代次：删掉 auth.json 重新生成后，旧 token 自动失效
+    sessionEpoch: randomInt(1, 2_000_000_000),
   };
 
   await mkdir(env.configDir, { recursive: true });
@@ -183,7 +192,8 @@ function sessionSecret(): Uint8Array {
 }
 
 export async function createSessionToken(): Promise<string> {
-  return new SignJWT({ sub: 'owner' })
+  const auth = await getAuthFile();
+  return new SignJWT({ sub: 'owner', ep: auth.sessionEpoch ?? 0 })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt()
     .setIssuer(ISSUER)
@@ -198,10 +208,38 @@ export async function verifySessionToken(token: string): Promise<boolean> {
       issuer: ISSUER,
       audience: ISSUER,
     });
-    return payload.sub === 'owner';
+    if (payload.sub !== 'owner') return false;
+
+    // 代次对不上 = 改过密码（或凭据文件被重建），旧 token 一律作废。
+    // 没有 ep 声明的是本次升级之前签发的，同样作废，强制重新登录一次。
+    const auth = await getAuthFile();
+    return payload.ep === (auth.sessionEpoch ?? 0);
   } catch {
     return false;
   }
+}
+
+/**
+ * 修改管理员密码。
+ *
+ * 会把 sessionEpoch +1，于是**所有已签发的会话立刻失效**（包括调用者自己），
+ * 调用方应引导用户用新密码重新登录。这是刻意的：改密码最常见的动机
+ * 是怀疑凭据泄露，如果旧 cookie 还能继续用，这个操作就白做了。
+ */
+export async function setPassword(newPassword: string): Promise<void> {
+  const current = await getAuthFile();
+  const next: AuthFile = {
+    version: 1,
+    passwordHash: hashPassword(newPassword),
+    createdAt: current.createdAt,
+    sessionEpoch: (current.sessionEpoch ?? 0) + 1,
+  };
+
+  await mkdir(env.configDir, { recursive: true });
+  await writeFile(authFilePath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  cachedAuth = next;
+
+  console.log(`[${env.appShort}] 管理员密码已更新，所有旧会话已失效。`);
 }
 
 /* ── PAT ──────────────────────────────────────────── */
