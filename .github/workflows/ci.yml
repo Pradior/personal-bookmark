@@ -74,6 +74,9 @@ jobs:
       - name: 自检：图片变体与 MIME
         run: pnpm --filter @pb/core check:image
 
+      - name: 自检：关键 SQL 片段
+        run: pnpm check:queries
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

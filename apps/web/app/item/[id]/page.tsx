@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import ItemTaxonomy from '@/components/ItemTaxonomy';
 import ReaderBody from '@/components/ReaderBody';
 import RetryButton from '@/components/RetryButton';
 import { authenticate } from '@/lib/session';
 import { getItem, getNeighbors } from '@/lib/items';
+import { listCollections, tagsOf } from '@/lib/taxonomy';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,13 @@ export default async function ReaderPage({ params }: Props) {
     prevTitle: null,
     nextTitle: null,
   }));
+
+  // 分类相关的数据取不到就当空，不影响阅读
+  const [collections, tagMap] = await Promise.all([
+    listCollections().catch(() => []),
+    tagsOf([id]).catch(() => new Map<string, string[]>()),
+  ]);
+  const itemTags = tagMap.get(id) ?? [];
 
   const published = row.publishedAt
     ? `${row.publishedAt.getFullYear()}-${String(row.publishedAt.getMonth() + 1).padStart(2, '0')}-${String(
@@ -115,6 +124,13 @@ export default async function ReaderPage({ params }: Props) {
           </div>
         </div>
       ) : null}
+
+      <ItemTaxonomy
+        itemId={row.id}
+        tags={itemTags}
+        collectionId={row.collectionId}
+        collections={collections}
+      />
 
       {row.contentHtml ? (
         <ReaderBody

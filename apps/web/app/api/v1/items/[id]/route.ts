@@ -56,7 +56,7 @@ export async function GET(
   }
 }
 
-/** 目前只允许改状态（归档/待读），标题与集合留到 Sprint 3 */
+/** 允许改：状态（归档/待读）、标题、所属集合 */
 export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -64,6 +64,7 @@ export async function PATCH(
   try {
     const auth = await authenticate(req);
     if (!auth) throw new ApiError(401, 'UNAUTHORIZED', '未登录');
+    if (!auth.scopes.includes('write')) throw new ApiError(403, 'FORBIDDEN', '该令牌无写入权限');
 
     const { id } = await ctx.params;
     if (!UUID_RE.test(id)) throw new ApiError(400, 'BAD_REQUEST', 'id 不是合法 UUID');
@@ -71,6 +72,8 @@ export async function PATCH(
     const raw = (await req.json().catch(() => ({}))) as {
       status?: string;
       title?: string;
+      /** null = 移出集合 */
+      collectionId?: string | null;
     };
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -81,13 +84,19 @@ export async function PATCH(
     if (typeof raw.title === 'string' && raw.title.trim().length > 0) {
       patch.title = raw.title.trim().slice(0, 500);
     }
+    // 显式区分"没传"和"传了 null"：后者表示移出集合
+    if (raw.collectionId === null) {
+      patch.collectionId = null;
+    } else if (typeof raw.collectionId === 'string' && UUID_RE.test(raw.collectionId)) {
+      patch.collectionId = raw.collectionId;
+    }
 
     const db = getDb();
     const updated = await db
       .update(item)
       .set(patch)
       .where(eq(item.id, id))
-      .returning({ id: item.id, status: item.status, title: item.title });
+      .returning({ id: item.id, status: item.status, title: item.title, collectionId: item.collectionId });
 
     if (!updated[0]) throw new ApiError(404, 'NOT_FOUND', '条目不存在');
 

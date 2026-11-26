@@ -82,6 +82,21 @@ export default function ItemCard({ item }: { item: ItemSummary }) {
             <span>{relativeTime(item.savedAt)}</span>
             {item.wordCount > 0 ? <span>{item.wordCount} 字</span> : null}
           </div>
+
+          {item.tags.length > 0 ? (
+            <div className="card-tags">
+              {item.tags.slice(0, 4).map((t) => (
+                <span className="tag is-small" key={t}>
+                  {t}
+                </span>
+              ))}
+              {item.tags.length > 4 ? (
+                <span className="subtle" style={{ fontSize: 11 }}>
+                  +{item.tags.length - 4}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </article>
     </Link>

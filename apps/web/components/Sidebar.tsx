@@ -1,4 +1,6 @@
 import type { SidebarData } from '@/lib/queries';
+import Link from 'next/link';
+import CollectionCreate from './CollectionCreate';
 import NavItem from './NavItem';
 import {
   IconBookOpen,
@@ -70,7 +72,7 @@ export default function Sidebar({ appName, data }: Props) {
         <div className="nav-section">
           <div className="nav-label">
             <span>集合</span>
-            <span title="Sprint 3 开放">＋</span>
+            <CollectionCreate />
           </div>
           {roots.length === 0 ? (
             <p className="nav-empty">还没有集合</p>
@@ -79,21 +81,21 @@ export default function Sidebar({ appName, data }: Props) {
               const children = all.filter((c) => c.parentId === root.id);
               return (
                 <div key={root.id}>
-                  <span className="nav-item" title="Sprint 3 开放集合视图">
+                  <NavItem href={`/collection/${root.id}`}>
                     <IconFolder className="glyph" />
                     <span className="label">{root.name}</span>
                     <Count n={root.count} />
-                  </span>
+                  </NavItem>
                   {children.map((child) => (
-                    <span
+                    <Link
                       key={child.id}
+                      href={`/collection/${child.id}`}
                       className="nav-item"
                       style={{ paddingLeft: 30 }}
-                      title="Sprint 3 开放集合视图"
                     >
                       <span className="label">{child.name}</span>
                       <Count n={child.count} />
-                    </span>
+                    </Link>
                   ))}
                 </div>
               );
@@ -107,10 +109,10 @@ export default function Sidebar({ appName, data }: Props) {
               <span>标签</span>
             </div>
             {data.tags.map((name) => (
-              <span key={name} className="nav-item" title="Sprint 3 开放标签筛选">
+              <NavItem key={name} href={`/tag/${encodeURIComponent(name)}`}>
                 <IconTag className="glyph" />
                 <span className="label">{name}</span>
-              </span>
+              </NavItem>
             ))}
           </div>
         )}

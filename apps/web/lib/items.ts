@@ -1,10 +1,16 @@
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { ItemSummary } from '@pb/contract';
 import { getDb, item } from '@pb/db';
+import { neighborFilter, tagExistsFilter } from './sqlFragments';
+import { tagsOf } from './taxonomy';
 
 export type ListOptions = {
   status?: 'inbox' | 'reading' | 'archived' | 'all';
   limit?: number;
+  /** 只看某个集合下的条目 */
+  collectionId?: string;
+  /** 只看带某个标签的条目 */
+  tagName?: string;
 };
 
 /**
@@ -17,12 +23,22 @@ export async function listItems(options: ListOptions = {}): Promise<ItemSummary[
     const limit = options.limit ?? 50;
     const status = options.status ?? 'all';
 
+    const where = [];
+    if (status !== 'all') where.push(eq(item.status, status));
+    if (options.collectionId) where.push(eq(item.collectionId, options.collectionId));
+    if (options.tagName) {
+      where.push(tagExistsFilter(options.tagName));
+    }
+
     const rows = await db
       .select()
       .from(item)
-      .where(status === 'all' ? undefined : eq(item.status, status))
+      .where(where.length > 0 ? and(...where) : undefined)
       .orderBy(desc(item.savedAt), desc(item.id))
       .limit(limit);
+
+    // 标签一次查完再按条目分组，避免 N+1
+    const tagMap = await tagsOf(rows.map((r) => r.id)).catch(() => new Map<string, string[]>());
 
     return rows.map((r) => ({
       id: r.id,
@@ -40,7 +56,7 @@ export async function listItems(options: ListOptions = {}): Promise<ItemSummary[
       wordCount: r.wordCount,
       collectionId: r.collectionId,
       coverAssetId: r.coverAssetId,
-      tags: [],
+      tags: tagMap.get(r.id) ?? [],
       fetchState: r.fetchState,
       fetchError: r.fetchError,
     }));
@@ -84,18 +100,13 @@ export async function getNeighbors(id: string): Promise<{
     db
       .select({ id: item.id, title: item.title })
       .from(item)
-      .where(
-        // 显式 cast：行构造器里的参数如果不带类型，Postgres 可能推断不出来
-        sql`(${item.savedAt}, ${item.id}) > (${me.savedAt}::timestamptz, ${me.id}::uuid)`,
-      )
+      .where(neighborFilter(me.savedAt, me.id, 'newer'))
       .orderBy(asc(item.savedAt), asc(item.id))
       .limit(1),
     db
       .select({ id: item.id, title: item.title })
       .from(item)
-      .where(
-        sql`(${item.savedAt}, ${item.id}) < (${me.savedAt}::timestamptz, ${me.id}::uuid)`,
-      )
+      .where(neighborFilter(me.savedAt, me.id, 'older'))
       .orderBy(desc(item.savedAt), desc(item.id))
       .limit(1),
   ]);
