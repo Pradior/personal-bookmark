@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import type { ItemSummary } from '@pb/contract';
 import ItemActions from './ItemActions';
@@ -32,23 +34,43 @@ const PROCESSING_LABEL: Record<string, string> = {
   assets: '正在下载图片…',
 };
 
-export default function ItemCard({ item }: { item: ItemSummary }) {
+export default function ItemCard({
+  item,
+  selected,
+  onToggle,
+}: {
+  item: ItemSummary;
+  /** 传了 onToggle 才显示勾选框 */
+  selected?: boolean;
+  onToggle?: (id: string, next: boolean) => void;
+}) {
   const processing = item.fetchState !== 'done' && item.fetchState !== 'failed';
   const failed = item.fetchState === 'failed';
   const read = item.status === 'archived';
+  const selectable = Boolean(onToggle);
 
   return (
     /**
      * 外层用 div 而不是把菜单塞进 Link：
      * <button> 不能作为 <a> 的后代（HTML 非法），而且点击会冒泡触发跳转。
-     * 所以菜单作为兄弟节点绝对定位在右上角。
+     * 所以勾选框与菜单都作为兄弟节点绝对定位。
      */
     <div
-      className="card-wrap"
+      className={`card-wrap${selected ? ' is-selected' : ''}`}
       data-item-id={item.id}
       // 键盘流（InboxKeyboard）据此定位卡片、取原文地址
       data-item-url={item.url ?? ''}
     >
+      {selectable ? (
+        <label className="card-check" title="选中">
+          <input
+            type="checkbox"
+            checked={Boolean(selected)}
+            onChange={(e) => onToggle?.(item.id, e.target.checked)}
+            aria-label="选中条目"
+          />
+        </label>
+      ) : null}
       <Link href={`/item/${item.id}`} className="card-link">
         <article className="card">
         <div className="card-cover">

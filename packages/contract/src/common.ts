@@ -47,7 +47,7 @@ export type ItemType = z.infer<typeof ItemType>;
 export const ItemSource = z.enum(['wechat', 'xhs', 'douyin', 'web', 'manual']);
 export type ItemSource = z.infer<typeof ItemSource>;
 
-export const ItemStatus = z.enum(['inbox', 'reading', 'archived']);
+export const ItemStatus = z.enum(['inbox', 'reading', 'archived', 'trashed']);
 export type ItemStatus = z.infer<typeof ItemStatus>;
 
 export const TagSource = z.enum(['manual', 'rule', 'propagated', 'llm']);

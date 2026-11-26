@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export type ItemActionState = {
   id: string;
-  status: 'inbox' | 'reading' | 'archived';
+  status: 'inbox' | 'reading' | 'archived' | 'trashed';
   /** 速记没有来源链接，不能重新抓取 */
   hasUrl: boolean;
   collectionId: string | null;
@@ -135,7 +135,12 @@ export default function ItemActions({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/items/${item.id}`, { method: 'DELETE' });
+      // 已经在回收站里的条目，删除 = 彻底删除（连图片一起清）
+      const url =
+        item.status === 'trashed'
+          ? `/api/v1/items/${item.id}?purge=1`
+          : `/api/v1/items/${item.id}`;
+      const res = await fetch(url, { method: 'DELETE' });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as
           | { error?: { message?: string } }
@@ -186,84 +191,109 @@ export default function ItemActions({
             e.stopPropagation();
           }}
         >
-          {item.hasUrl ? (
-            <button type="button" role="menuitem" onClick={() => void retry()} disabled={busy}>
-              重新抓取
-            </button>
-          ) : (
-            <button type="button" role="menuitem" disabled title="速记没有来源链接">
-              重新抓取
-            </button>
-          )}
-
-          {item.status === 'archived' ? (
-            <button type="button" role="menuitem" onClick={() => void patch({ status: 'inbox' })} disabled={busy}>
-              移回收件箱
-            </button>
-          ) : (
-            <button type="button" role="menuitem" onClick={() => void patch({ status: 'archived' })} disabled={busy}>
-              归档
-            </button>
-          )}
-
-          {item.status !== 'reading' ? (
-            <button type="button" role="menuitem" onClick={() => void patch({ status: 'reading' })} disabled={busy}>
-              标为待读
-            </button>
-          ) : null}
-
-          <div className="actions-sep" role="separator" />
-
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              void loadCollections();
-              setShowCollections((v) => !v);
-            }}
-            aria-expanded={showCollections}
-          >
-            移到集合 ▸
-          </button>
-
-          {showCollections ? (
-            <div className="actions-sub">
+          {item.status === 'trashed' ? (
+            <>
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => void patch({ collectionId: null })}
-                disabled={busy || item.collectionId === null}
+                onClick={() => void patch({ status: 'inbox' })}
+                disabled={busy}
               >
-                未归类
+                恢复到收件箱
               </button>
-              {(collections ?? []).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => void patch({ collectionId: c.id })}
-                  disabled={busy || item.collectionId === c.id}
-                >
-                  {c.name}
+              <div className="actions-sep" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className={confirmDelete ? 'is-danger' : undefined}
+                onClick={() => void remove()}
+                disabled={busy}
+              >
+                {confirmDelete ? '确认彻底删除（不可恢复）' : '彻底删除'}
+              </button>
+            </>
+          ) : (
+            <>
+              {item.hasUrl ? (
+                <button type="button" role="menuitem" onClick={() => void retry()} disabled={busy}>
+                  重新抓取
                 </button>
-              ))}
-              {collections && collections.length === 0 ? (
-                <span className="actions-empty">还没有集合，先去侧栏 ＋ 建一个</span>
+              ) : (
+                <button type="button" role="menuitem" disabled title="速记没有来源链接">
+                  重新抓取
+                </button>
+              )}
+
+              {item.status === 'archived' ? (
+                <button type="button" role="menuitem" onClick={() => void patch({ status: 'inbox' })} disabled={busy}>
+                  移回收件箱
+                </button>
+              ) : (
+                <button type="button" role="menuitem" onClick={() => void patch({ status: 'archived' })} disabled={busy}>
+                  归档
+                </button>
+              )}
+
+              {item.status !== 'reading' ? (
+                <button type="button" role="menuitem" onClick={() => void patch({ status: 'reading' })} disabled={busy}>
+                  标为待读
+                </button>
               ) : null}
-            </div>
-          ) : null}
 
-          <div className="actions-sep" role="separator" />
+              <div className="actions-sep" role="separator" />
 
-          <button
-            type="button"
-            role="menuitem"
-            className={confirmDelete ? 'is-danger' : undefined}
-            onClick={() => void remove()}
-            disabled={busy}
-          >
-            {confirmDelete ? '确认删除（不可恢复）' : '删除'}
-          </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  void loadCollections();
+                  setShowCollections((v) => !v);
+                }}
+                aria-expanded={showCollections}
+              >
+                移到集合 ▸
+              </button>
+
+              {showCollections ? (
+                <div className="actions-sub">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void patch({ collectionId: null })}
+                    disabled={busy || item.collectionId === null}
+                  >
+                    未归类
+                  </button>
+                  {(collections ?? []).map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void patch({ collectionId: c.id })}
+                      disabled={busy || item.collectionId === c.id}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                  {collections && collections.length === 0 ? (
+                    <span className="actions-empty">还没有集合，先去侧栏 ＋ 建一个</span>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="actions-sep" role="separator" />
+
+              <button
+                type="button"
+                role="menuitem"
+                className={confirmDelete ? 'is-danger' : undefined}
+                onClick={() => void remove()}
+                disabled={busy}
+              >
+                {confirmDelete ? '确认删除' : '删除'}
+              </button>
+            </>
+          )}
 
           {error ? <div className="actions-error">{error}</div> : null}
         </div>

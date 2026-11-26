@@ -56,7 +56,7 @@ export const itemSourceEnum = pgEnum('item_source', [
   'manual',
 ]);
 
-export const itemStatusEnum = pgEnum('item_status', ['inbox', 'reading', 'archived']);
+export const itemStatusEnum = pgEnum('item_status', ['inbox', 'reading', 'archived', 'trashed']);
 
 export const tagSourceEnum = pgEnum('tag_source', ['manual', 'rule', 'propagated', 'llm']);
 
@@ -136,6 +136,11 @@ export const item = pgTable(
     publishedAt: timestamp('published_at', { withTimezone: true }),
     savedAt: timestamp('saved_at', { withTimezone: true }).notNull().defaultNow(),
     readAt: timestamp('read_at', { withTimezone: true }),
+    /**
+     * 进回收站的时间。status='trashed' 时才有值。
+     * 存时间而不是布尔，是为了将来能"保留 30 天后自动清除"。
+     */
+    trashedAt: timestamp('trashed_at', { withTimezone: true }),
 
     /** 清洗后、图片已改写为 /api/v1/assets/:id */
     contentHtml: text('content_html'),
@@ -179,6 +184,7 @@ export const item = pgTable(
     index('item_status_saved_idx').on(t.status, t.savedAt),
     index('item_collection_idx').on(t.collectionId, t.savedAt),
     index('item_source_idx').on(t.source),
+    index('item_trashed_idx').on(t.trashedAt),
     index('item_simhash_idx').on(t.simhash),
     index('item_url_idx').on(t.url),
   ],

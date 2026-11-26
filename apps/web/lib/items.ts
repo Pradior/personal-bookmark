@@ -1,21 +1,28 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import type { ItemSummary } from '@pb/contract';
 import { getDb, item } from '@pb/db';
-import { neighborFilter, tagExistsFilter } from './sqlFragments';
+import { neighborFilter, searchFilter, tagExistsFilter } from './sqlFragments';
 import { tagsOf } from './taxonomy';
 
 export type ListOptions = {
-  status?: 'inbox' | 'reading' | 'archived' | 'all';
+  status?: 'inbox' | 'reading' | 'archived' | 'trashed' | 'all';
   limit?: number;
   /** 只看某个集合下的条目 */
   collectionId?: string;
   /** 只看带某个标签的条目 */
   tagName?: string;
+  /** 只看某个来源 */
+  source?: 'wechat' | 'xhs' | 'douyin' | 'web' | 'manual';
+  /** 关键词：标题/正文/摘要，配合 FTS 与 trigram */
+  search?: string;
 };
 
 /**
  * 服务端列表查询（页面用）。
  * 数据库不可用时返回 null，页面据此显示降级提示而不是白屏。
+ *
+ * 默认**不含回收站**：除非明确要 status='trashed'，否则 trashed 永远被排除。
+ * 这条规则放在这里统一兜住，避免每个页面都要记得加。
  */
 export async function listItems(options: ListOptions = {}): Promise<ItemSummary[] | null> {
   try {
@@ -24,10 +31,18 @@ export async function listItems(options: ListOptions = {}): Promise<ItemSummary[
     const status = options.status ?? 'all';
 
     const where = [];
-    if (status !== 'all') where.push(eq(item.status, status));
+    if (status === 'all') {
+      where.push(sql`${item.status} <> 'trashed'`);
+    } else {
+      where.push(eq(item.status, status));
+    }
     if (options.collectionId) where.push(eq(item.collectionId, options.collectionId));
+    if (options.source) where.push(eq(item.source, options.source));
     if (options.tagName) {
       where.push(tagExistsFilter(options.tagName));
+    }
+    if (options.search?.trim()) {
+      where.push(searchFilter(options.search));
     }
 
     const rows = await db

@@ -11,6 +11,7 @@ import {
   IconSearch,
   IconSettings,
   IconTag,
+  IconTrash,
 } from './icons';
 
 type Props = {
@@ -23,7 +24,7 @@ function Count({ n }: { n: number }) {
 }
 
 export default function Sidebar({ appName, data }: Props) {
-  const counts = data?.counts ?? { inbox: 0, reading: 0, all: 0, archived: 0 };
+  const counts = data?.counts ?? { inbox: 0, reading: 0, all: 0, archived: 0, trashed: 0 };
   const all = data?.collections ?? [];
   const roots = all.filter((c) => c.parentId === null);
 
@@ -66,6 +67,11 @@ export default function Sidebar({ appName, data }: Props) {
             <IconLayers className="glyph" />
             <span className="label">全部条目</span>
             <Count n={counts.all} />
+          </NavItem>
+          <NavItem href="/trash">
+            <IconTrash className="glyph" />
+            <span className="label">回收站</span>
+            <Count n={counts.trashed} />
           </NavItem>
         </div>
 

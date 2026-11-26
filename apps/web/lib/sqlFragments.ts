@@ -22,6 +22,29 @@ export function tagExistsFilter(tagName: string): SQL {
 }
 
 /**
+ * 关键词搜索：FTS 与子串匹配取并集。
+ *
+ * 两条路都要，因为各覆盖一半场景：
+ *   - FTS（search_text 是 jieba 预分词结果）对中文分词准，但**速记的
+ *     search_text 是空的**（web 侧没有 jieba），所以速记只能靠子串匹配
+ *   - trigram/ILIKE 能命中任意子串，但大正文上慢；有 gin_trgm_ops 索引兜着
+ * 用 OR 合并而不是二选一，是为了"宁多不漏"——搜不到比搜出几条无关的更糟。
+ */
+export function searchFilter(keyword: string): SQL {
+  const raw = keyword.trim().slice(0, 200);
+  // ILIKE 的通配符要转义，否则用户输入 % 就变成全表匹配
+  const escaped = raw.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  const pattern = `%${escaped}%`;
+
+  return sql`(
+    (${item.searchText} <> '' and to_tsvector('simple', ${item.searchText}) @@ plainto_tsquery('simple', ${raw}))
+    or ${item.title} ilike ${pattern}
+    or ${item.contentText} ilike ${pattern}
+    or ${item.excerpt} ilike ${pattern}
+  )`;
+}
+
+/**
  * 列表里相对某条的前/后邻居。
  *
  * 必须用 (saved_at, id) 元组比较：只比 saved_at 会在"同一秒存两条"时

@@ -7,6 +7,7 @@ export type SidebarCounts = {
   reading: number;
   all: number;
   archived: number;
+  trashed: number;
 };
 
 export type CollectionNode = {
@@ -23,7 +24,7 @@ export type SidebarData = {
 };
 
 const EMPTY: SidebarData = {
-  counts: { inbox: 0, reading: 0, all: 0, archived: 0 },
+  counts: { inbox: 0, reading: 0, all: 0, archived: 0, trashed: 0 },
   collections: [],
   tags: [],
 };
@@ -44,11 +45,12 @@ export async function loadSidebarData(): Promise<SidebarData | null> {
       .from(item)
       .groupBy(item.status);
 
-    const counts: SidebarCounts = { inbox: 0, reading: 0, all: 0, archived: 0 };
+    const counts: SidebarCounts = { inbox: 0, reading: 0, all: 0, archived: 0, trashed: 0 };
     for (const row of statusRows) {
       const n = Number(row.n);
       counts[row.status] = n;
-      counts.all += n;
+      // 「全部条目」不把回收站算进去，否则数字会虚高
+      if (row.status !== 'trashed') counts.all += n;
     }
 
     const collections = await db

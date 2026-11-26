@@ -6,27 +6,31 @@ type Props = {
   title: string;
   dbReady: boolean;
   children: ReactNode;
+  /** 当前搜索词，回填到输入框 */
+  searchValue?: string;
 };
 
 /**
  * 列表区 + 阅读区骨架（SPEC §9.2 / §9.4 / §9.9）。
  * 三栏断点由 .shell 的 grid 决定，这里只负责两栏的内容。
  */
-export default function ListPage({ title, dbReady, children }: Props) {
+export default function ListPage({ title, dbReady, children, searchValue }: Props) {
   return (
     <>
       <main className="list-pane">
         <div className="topbar">
           <span className="topbar-title">{title}</span>
-          <div className="topbar-search">
+          {/* 用原生 form：不依赖 JS 就能提交，刷新后 URL 里带着 ?q= 也可分享 */}
+          <form className="topbar-search" action="/search" method="get" role="search">
             <input
               className="input"
               type="search"
-              placeholder="搜索（Sprint 3）"
+              name="q"
+              defaultValue={searchValue}
+              placeholder="搜索标题与正文，回车"
               aria-label="搜索"
-              disabled
             />
-          </div>
+          </form>
           <div className="topbar-tools">
             <ThemeSwitch />
           </div>

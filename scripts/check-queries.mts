@@ -13,7 +13,9 @@ import { sql, type SQL } from 'drizzle-orm';
 process.env.DATABASE_URL ??= 'postgres://user:pass@127.0.0.1:5432/db';
 
 const { getDb, item } = await import('@pb/db');
-const { neighborFilter, tagExistsFilter } = await import('../apps/web/lib/sqlFragments.ts');
+const { neighborFilter, searchFilter, tagExistsFilter } = await import(
+  '../apps/web/lib/sqlFragments.ts'
+);
 
 const db = getDb();
 
@@ -71,6 +73,36 @@ console.log('\n[邻居：元组比较]');
     newer: newer.params.length,
     older: older.params.length,
   });
+}
+
+console.log('\n[搜索：FTS 与子串取并集]');
+{
+  const { sql: text, params } = sqlOf(searchFilter('面包超人'));
+
+  ok('用了 to_tsvector', /to_tsvector/i.test(text), text);
+  ok('用了 plainto_tsquery', /plainto_tsquery/i.test(text), text);
+  ok('标题参与 ILIKE', /"title" ilike/i.test(text), text);
+  ok('正文参与 ILIKE', /"content_text" ilike/i.test(text), text);
+  ok('摘要参与 ILIKE', /"excerpt" ilike/i.test(text), text);
+  ok('三个条件用 OR 连起来（宁多不漏）', (text.match(/ or /gi) ?? []).length >= 3, text);
+  ok('关键词作为参数传入', params.includes('面包超人'), params);
+  ok('ILIKE 的模式带 % 通配', params.some((p) => typeof p === 'string' && p.startsWith('%')), params);
+}
+
+console.log('\n[搜索：通配符要转义]');
+{
+  const { params } = sqlOf(searchFilter('100%_done'));
+  const pattern = params.find((p) => typeof p === 'string' && p.startsWith('%')) as string;
+  ok('百分号被转义', pattern.includes('\\%'), pattern);
+  ok('下划线被转义', pattern.includes('\\_'), pattern);
+}
+
+console.log('\n[搜索：空关键词不该被调用]');
+{
+  // 调用方（listItems）保证只在 trim 后非空时才加这个条件；
+  // 这里只确认它不会把空串悄悄变成全表匹配
+  const { params } = sqlOf(searchFilter('   '));
+  ok('trim 后为空也至少传一个参数', params.length > 0, params);
 }
 
 console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

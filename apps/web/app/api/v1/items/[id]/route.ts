@@ -4,7 +4,7 @@ import type { ItemDetail } from '@pb/contract';
 import { getDb, item } from '@pb/db';
 import { authenticate } from '@/lib/session';
 import { ApiError, jsonError } from '@/lib/api';
-import { deleteItemDeep } from '@/lib/itemDelete';
+import { purgeItems, trashItems } from '@/lib/bulk';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -108,11 +108,10 @@ export async function PATCH(
 }
 
 /**
- * 删除条目（不可恢复）
+ * 删除条目
  *
- * 会连带删掉：资产行、变体行、标签关联、快照、高亮，以及**磁盘上的图片文件**。
- * 文件删除失败不阻断删除（返回里带 filesFailed），否则用户会看到
- * "删不掉"却没法处理；孤儿文件留给后续清理任务扫。
+ * 默认是**软删除**（进回收站）：用户按错一次不该丢内容。
+ * 加 `?purge=1` 才真正删除行与磁盘文件 —— 仅供回收站页面使用。
  */
 export async function DELETE(
   req: NextRequest,
@@ -126,8 +125,9 @@ export async function DELETE(
     const { id } = await ctx.params;
     if (!UUID_RE.test(id)) throw new ApiError(400, 'BAD_REQUEST', 'id 不是合法 UUID');
 
-    const result = await deleteItemDeep(id);
-    if (!result.ok) throw new ApiError(404, 'NOT_FOUND', '条目不存在');
+    const purge = new URL(req.url).searchParams.get('purge') === '1';
+    const result = purge ? await purgeItems([id]) : await trashItems([id]);
+    if (result.affected === 0) throw new ApiError(404, 'NOT_FOUND', '条目不存在');
 
     return NextResponse.json(result);
   } catch (err) {

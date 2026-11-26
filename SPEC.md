@@ -1677,6 +1677,43 @@ CSS 变量 + `data-theme`，一套 token 撑三种主题。
 
 速记没有来源链接，「重新抓取」对它是禁用的。
 
+#### 回收站、多选、筛选、搜索（v1.0）
+
+**回收站用软删除**：`item.status` 新增枚举值 `trashed`，配 `trashed_at` 时间戳。
+
+| 决策 | 做法 | 理由 |
+|---|---|---|
+| 为什么不加 `deleted_at` 列 | 加枚举值，复用现有 `status` 过滤 | 所有列表查询本来就按 status 走；再加一列等于每条查询都要记得加 `and deleted_at is null`，迟早漏 |
+| 默认排除 | `listItems` 里统一处理：`status='all'` 时强制 `status <> 'trashed'` | 规则收在一处，页面不用各记一遍 |
+| 何时真删 | 只有回收站里能调 `?purge=1` / `batch(purge)` | 误调用批量接口不会把正常条目抹掉 |
+| 批量为什么一条接口 | `POST /api/v1/items/batch`，`UPDATE ... WHERE id = ANY(...)` | 前端循环发 N 个请求会半途失败，列表和实际对不上 |
+| 侧栏「全部条目」计数 | 不含回收站 | 否则删了东西数字不变，用户会困惑 |
+
+**多选**：勾选框在卡片外层绝对定位（不能放进 `<a>`，原因同上），
+选中状态由 `ItemList` 统一持有 —— 全选/批量操作需要知道整体状态。
+批量操作条固定在视口底部，滚动时始终可见。
+
+**筛选**：`/inbox?source=xhs` 这类 URL 参数驱动，服务端渲染；
+筛选可分享、可后退。
+
+**搜索**：
+
+```sql
+(search_text <> '' AND to_tsvector('simple', search_text) @@ plainto_tsquery('simple', $q))
+ OR title ILIKE $pattern
+ OR content_text ILIKE $pattern
+ OR excerpt ILIKE $pattern
+```
+
+三条路都要，因为各覆盖一半场景：
+
+- FTS 依赖 jieba 预分词的 `search_text`——**速记的 search_text 是空的**
+  （web 侧没有 jieba），所以速记只能靠子串匹配
+- trigram/ILIKE 能命中任意中文子串，配 `gin_trgm_ops` 索引（`content_text` 新加）
+- 用 OR 合并而不是二选一：**宁多不漏**，搜不到比搜出几条无关的更糟
+
+ILIKE 的 `%` `_` 必须转义，否则用户输入一个 `%` 就变成全表匹配。
+
 ### 9.7 关键页面清单
 
 | 路由 | 页面 | 参考 | 交付 Sprint |
