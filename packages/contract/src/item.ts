@@ -27,7 +27,8 @@ export const ItemSummary = z.object({
   type: ItemType,
   source: ItemSource,
   status: ItemStatus,
-  url: z.string(),
+  /** 速记没有来源链接，为 null */
+  url: z.string().nullable(),
   title: z.string().nullable(),
   author: z.string().nullable(),
   siteName: z.string().nullable(),

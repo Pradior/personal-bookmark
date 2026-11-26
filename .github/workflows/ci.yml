@@ -71,6 +71,9 @@ jobs:
       - name: 自检：客户端提示合并
         run: pnpm --filter @pb/core check:hints
 
+      - name: 自检：图片变体与 MIME
+        run: pnpm --filter @pb/core check:image
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

@@ -117,10 +117,17 @@ export const item = pgTable(
     source: itemSourceEnum('source').notNull().default('web'),
     status: itemStatusEnum('status').notNull().default('inbox'),
 
-    /** 原始链接，用于「原文 ↗」，不去参数 */
-    url: text('url').notNull(),
-    /** 规范化链接，用于精确去重（SPEC §6.4） */
-    canonicalUrl: text('canonical_url').notNull(),
+    /**
+     * 原始链接，用于「原文 ↗」，不去参数。
+     * 可为空：速记（文字/图片）没有来源链接。
+     */
+    url: text('url'),
+    /**
+     * 规范化链接，用于精确去重（SPEC §6.4）。
+     * 可为空；唯一索引是**部分索引**（WHERE canonical_url IS NOT NULL），
+     * 否则多条速记的 NULL 会互相冲突。
+     */
+    canonicalUrl: text('canonical_url'),
 
     title: text('title'),
     author: text('author'),
@@ -166,7 +173,9 @@ export const item = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('item_canonical_url_idx').on(t.canonicalUrl),
+    uniqueIndex('item_canonical_url_idx')
+      .on(t.canonicalUrl)
+      .where(sql`"canonical_url" IS NOT NULL`),
     index('item_status_saved_idx').on(t.status, t.savedAt),
     index('item_collection_idx').on(t.collectionId, t.savedAt),
     index('item_source_idx').on(t.source),

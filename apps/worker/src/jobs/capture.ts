@@ -44,7 +44,17 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
     return;
   }
 
+  // 速记没有来源链接，不会进抓取队列；真进来了就是数据不一致
   const url = row.url;
+  if (!url) {
+    console.warn(`[capture] 条目没有来源链接，跳过: ${itemId}`);
+    await db
+      .update(item)
+      .set({ fetchState: 'failed', fetchError: '该条目没有来源链接，无法抓取' })
+      .where(eq(item.id, itemId));
+    return;
+  }
+
   console.log(`[capture] 开始处理 ${itemId} ${url.slice(0, 90)}`);
 
   const setState = async (

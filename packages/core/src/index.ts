@@ -49,3 +49,11 @@ export {
 } from './sanitize';
 
 export { applyHints, type CaptureHints } from './hints';
+
+// 纯逻辑，不含 sharp —— web 可以安全引用
+export {
+  DEFAULT_RENDER,
+  extForMime,
+  normalizeMime,
+  type RenderOptions,
+} from './imageMime';

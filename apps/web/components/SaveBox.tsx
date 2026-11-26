@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import NoteComposer from './NoteComposer';
+import { IconPen } from './icons';
 
 type Phase = 'idle' | 'saving' | 'polling' | 'done' | 'duplicate' | 'failed';
 
@@ -25,6 +27,7 @@ export default function SaveBox() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState('');
   const [itemId, setItemId] = useState<string | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const poll = useCallback(
@@ -132,7 +135,25 @@ export default function SaveBox() {
         >
           {phase === 'saving' || phase === 'polling' ? '处理中…' : '保存'}
         </button>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => setNoteOpen(true)}
+          title="写一条文字/图片速记"
+        >
+          <IconPen />
+          <span className="savebox-note-label">速记</span>
+        </button>
       </div>
+
+      <NoteComposer
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+        onSaved={(id) => {
+          // 存完直接跳到那条速记，省一步
+          router.push(`/item/${id}`);
+        }}
+      />
 
       {phase !== 'idle' && PHASE_TEXT[phase] ? (
         <div

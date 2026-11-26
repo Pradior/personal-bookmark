@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./image": "./src/imageVariants.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -15,10 +16,12 @@
     "check:xhs": "tsx ./test/xhs.check.ts",
     "check:douyin": "tsx ./test/douyin.check.ts",
     "check:credential": "tsx ./test/credential.check.ts",
-    "check:hints": "tsx ./test/hints.check.ts"
+    "check:hints": "tsx ./test/hints.check.ts",
+    "check:image": "tsx ./test/image.check.ts"
   },
   "dependencies": {
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

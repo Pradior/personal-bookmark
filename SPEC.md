@@ -1126,6 +1126,27 @@ jsdom + @mozilla/readability
 编辑器：TipTap，支持粘贴图片直接上传
 ```
 
+**实现状态（v0.9）**：已实现，但与上面有三处刻意偏离。
+
+| 项 | 原设计 | 实际 | 原因 |
+|---|---|---|---|
+| 编辑器 | TipTap | 纯 `<textarea>` + 图片附件 | 速记的价值是"快"；富文本会让人开始排版，反而慢了。需要排版的内容应该走文章 |
+| 图片处理 | worker 队列 | web 请求内同步处理 | "点了就存下来"，走队列反而慢。但派生参数与 MIME 映射仍共用 `@pb/core` 的那一份 |
+| 数据模型 | hint.noteHtml | `item.type='note'`, `url` 为 NULL | 速记没有来源链接，硬塞一个伪 URL 后患更多（reader 的「原文 ↗」、去重都得多加判断） |
+
+配套改动：
+
+- `item.url` / `item.canonical_url` 改为可空；唯一索引改为**部分索引**
+  （`WHERE canonical_url IS NOT NULL`），否则多条速记的 NULL 会互相冲突（迁移 `0004`）
+- 图片派生逻辑拆成两半：`@pb/core` 导出纯逻辑（`normalizeMime` / `extForMime` /
+  `DEFAULT_RENDER`），需要 sharp 的 `renderVariants` 走 `@pb/core/image` 子路径。
+  **原因**：web 通过 `transpilePackages` 把 core 源码编进自己的包，core 主入口一旦
+  出现 `import sharp`，webpack 会把 sharp 也打进去，构建阶段直接失败
+  （`Could not load the sharp module using the win32-x64 runtime`）。
+- 上传接口 `POST /api/v1/notes`（multipart）：`text` + 0–9 个 `images`。
+  单张 ≤15MB，单条 ≤9 张；重复图片按 sha256 去重；单张失败不影响整条，
+  失败原因回传给前端显示。
+
 ### 6.4 URL 规范化规则
 
 ```ts

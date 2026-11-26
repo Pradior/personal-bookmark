@@ -41,15 +41,18 @@ export default async function ReaderPage({ params }: Props) {
           <h1 className="reader-title">{row.title ?? '（无标题）'}</h1>
           {metaLine ? <div className="reader-meta">{metaLine}</div> : null}
         </div>
-        <a
-          className="btn"
-          href={row.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="在新窗口打开原文"
-        >
-          原文 ↗
-        </a>
+        {/* 速记没有来源链接，就不显示「原文 ↗」 */}
+        {row.url ? (
+          <a
+            className="btn"
+            href={row.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在新窗口打开原文"
+          >
+            原文 ↗
+          </a>
+        ) : null}
       </header>
 
       {row.fetchState === 'failed' ? (

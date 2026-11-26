@@ -29,6 +29,13 @@
       "when": 1795577600118,
       "tag": "0003_optimal_daredevil",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795662690353,
+      "tag": "0004_wandering_rocket_racer",
+      "breakpoints": true
     }
   ]
 }

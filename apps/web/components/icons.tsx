@@ -19,6 +19,24 @@ function base(props: Props) {
   };
 }
 
+export function IconX(props: Props) {
+  return (
+    <svg {...base(props)}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+export function IconPen(props: Props) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
 export function IconInbox(props: Props) {
   return (
     <svg {...base(props)}>

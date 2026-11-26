@@ -8,10 +8,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import sharp from 'sharp';
 import { and, eq } from 'drizzle-orm';
 import { asset, assetVariant, type Database } from '@pb/db';
 import { fetchBinary } from '@pb/core';
+import { extForMime, renderVariants } from '@pb/core/image';
 
 export type IngestOptions = {
   url: string;
@@ -33,47 +33,6 @@ export type Ingested = {
   sourceAvailable: boolean;
 };
 
-const EXT: Record<string, string> = {
-  'image/webp': 'webp',
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/gif': 'gif',
-  'image/avif': 'avif',
-  'image/svg+xml': 'svg',
-  'image/svg': 'svg',
-};
-
-function extFor(mime: string): string {
-  return EXT[mime.split(';')[0]?.trim().toLowerCase() ?? ''] ?? 'bin';
-}
-
-/**
- * sharp 的 metadata().format 给的是 'svg'，直接拼成 `image/svg` 是错的
- * （浏览器只认 `image/svg+xml`，否则拒绝渲染 → 裂图）。
- * 这里统一把格式名规范化成正确的 MIME。
- */
-function normalizeMime(format: string | undefined, fallback: string): string {
-  const f = (format ?? '').trim().toLowerCase();
-  const map: Record<string, string> = {
-    svg: 'image/svg+xml',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    webp: 'image/webp',
-    gif: 'image/gif',
-    avif: 'image/avif',
-    heif: 'image/heif',
-    tiff: 'image/tiff',
-  };
-  return map[f] ?? (fallback.split(';')[0]?.trim() || 'application/octet-stream');
-}
-
-/**
- * 太小的图大概率是图标、头像、角标，不是正文配图。
- * 小红书空壳页里唯一的 xhscdn 图片就是一个 32×32 的搜索图标，
- * 之前被当成笔记配图存了下来（见 2026-11-26 诊断）。
- */
-const MIN_EDGE = Number(process.env.MIN_ASSET_EDGE ?? 120);
 
 /**
  * 抓取一张图 → 派生两档 → 落盘 → 写库。
@@ -124,18 +83,17 @@ export async function ingestImage(
       };
     }
 
-    // 3) 探查源图
-    const probe = sharp(res.body, { animated: true });
-    const meta = await probe.metadata();
-    const sourceMime = normalizeMime(meta.format, res.contentType);
-    const animated = (meta.pages ?? 1) > 1;
-    const isSvg = sourceMime.includes('svg');
+    // 3) 派生两档（实现收敛在 @pb/core/image，速记上传也走同一份）
+    const variants = await renderVariants(res.body, {
+      maxEdge: displayMaxEdge,
+      quality: displayQuality,
+    });
 
     // 图标/头像/角标一律跳过：比这还小的东西不会是正文配图
-    const w0 = meta.width ?? 0;
-    const h0 = meta.height ?? 0;
-    if (!animated && w0 > 0 && h0 > 0 && w0 < MIN_EDGE && h0 < MIN_EDGE) {
-      console.log(`[assets] 跳过小图 ${w0}×${h0}: ${url.slice(0, 80)}`);
+    if (variants.tooSmall) {
+      console.log(
+        `[assets] 跳过小图 ${variants.sourceWidth}×${variants.sourceHeight}: ${url.slice(0, 80)}`,
+      );
       return null;
     }
 
@@ -143,46 +101,18 @@ export async function ingestImage(
     const bucket = sha256.slice(0, 2);
     const base = join(assetsDir, bucket);
 
-    // 4) 派生两档
-    let displayBuf: Buffer;
-    let displayMime: string;
-    let displayWidth = meta.width;
-    let displayHeight = meta.height;
-
-    if (animated || isSvg) {
-      // 动图转码会丢帧；SVG 不该栅格化 —— 两者都原样保存
-      displayBuf = res.body;
-      displayMime = sourceMime;
-    } else {
-      const out = await sharp(res.body)
-        .rotate() // 按 EXIF 方向摆正（同时会剥掉 EXIF，含 GPS）
-        .resize({
-          width: displayMaxEdge,
-          height: displayMaxEdge,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({ quality: displayQuality })
-        .toBuffer({ resolveWithObject: true });
-      displayBuf = out.data;
-      displayMime = 'image/webp';
-      displayWidth = out.info.width;
-      displayHeight = out.info.height;
-    }
-
-    const thumbBuf = await sharp(res.body, { animated: false })
-      .rotate()
-      .resize({ width: 400, height: 400, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 75 })
-      .toBuffer({ resolveWithObject: true });
+    const displayBuf = variants.display.buf;
+    const displayMime = variants.display.mime;
+    const displayWidth = variants.display.width;
+    const displayHeight = variants.display.height;
 
     // 5) 落盘（用 assetId 命名，避免不同条目同图互相覆盖）
-    const displayKey = `${bucket}/${assetId}-display.${extFor(displayMime)}`;
+    const displayKey = `${bucket}/${assetId}-display.${extForMime(displayMime)}`;
     const thumbKey = `${bucket}/${assetId}-thumb.webp`;
 
     await mkdir(base, { recursive: true });
     await writeFile(join(assetsDir, displayKey), displayBuf);
-    await writeFile(join(assetsDir, thumbKey), thumbBuf.data);
+    await writeFile(join(assetsDir, thumbKey), variants.thumb.buf);
 
     // 6) 写库
     await db.insert(asset).values({
@@ -190,15 +120,15 @@ export async function ingestImage(
       itemId,
       kind: 'image',
       sha256,
-      sourceMime,
-      sourceWidth: meta.width,
-      sourceHeight: meta.height,
+      sourceMime: variants.sourceMime,
+      sourceWidth: variants.sourceWidth,
+      sourceHeight: variants.sourceHeight,
       sourceBytes: res.bytes,
       mime: displayMime,
       width: displayWidth,
       height: displayHeight,
       bytes: displayBuf.byteLength,
-      animated,
+      animated: variants.animated,
       originUrl: url,
       originReferer: referer,
       originUserAgent: userAgent,
@@ -221,9 +151,9 @@ export async function ingestImage(
         variant: 'thumb',
         storageKey: thumbKey,
         mime: 'image/webp',
-        bytes: thumbBuf.data.byteLength,
-        width: thumbBuf.info.width,
-        height: thumbBuf.info.height,
+        bytes: variants.thumb.buf.byteLength,
+        width: variants.thumb.width,
+        height: variants.thumb.height,
       },
     ]);
 
