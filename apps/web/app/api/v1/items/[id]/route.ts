@@ -4,6 +4,7 @@ import type { ItemDetail } from '@pb/contract';
 import { getDb, item } from '@pb/db';
 import { authenticate } from '@/lib/session';
 import { ApiError, jsonError } from '@/lib/api';
+import { deleteItemDeep } from '@/lib/itemDelete';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -101,6 +102,34 @@ export async function PATCH(
     if (!updated[0]) throw new ApiError(404, 'NOT_FOUND', '条目不存在');
 
     return NextResponse.json(updated[0]);
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+/**
+ * 删除条目（不可恢复）
+ *
+ * 会连带删掉：资产行、变体行、标签关联、快照、高亮，以及**磁盘上的图片文件**。
+ * 文件删除失败不阻断删除（返回里带 filesFailed），否则用户会看到
+ * "删不掉"却没法处理；孤儿文件留给后续清理任务扫。
+ */
+export async function DELETE(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  try {
+    const auth = await authenticate(req);
+    if (!auth) throw new ApiError(401, 'UNAUTHORIZED', '未登录');
+    if (!auth.scopes.includes('write')) throw new ApiError(403, 'FORBIDDEN', '该令牌无写入权限');
+
+    const { id } = await ctx.params;
+    if (!UUID_RE.test(id)) throw new ApiError(400, 'BAD_REQUEST', 'id 不是合法 UUID');
+
+    const result = await deleteItemDeep(id);
+    if (!result.ok) throw new ApiError(404, 'NOT_FOUND', '条目不存在');
+
+    return NextResponse.json(result);
   } catch (err) {
     return jsonError(err);
   }

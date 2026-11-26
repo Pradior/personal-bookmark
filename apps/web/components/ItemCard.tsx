@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ItemSummary } from '@pb/contract';
+import ItemActions from './ItemActions';
 
 const SOURCE_LABEL: Record<string, string> = {
   wechat: '公众号',
@@ -37,14 +38,19 @@ export default function ItemCard({ item }: { item: ItemSummary }) {
   const read = item.status === 'archived';
 
   return (
-    <Link
-      href={`/item/${item.id}`}
-      className="card-link"
-      // 键盘流（InboxKeyboard）据此定位卡片、取原文地址
+    /**
+     * 外层用 div 而不是把菜单塞进 Link：
+     * <button> 不能作为 <a> 的后代（HTML 非法），而且点击会冒泡触发跳转。
+     * 所以菜单作为兄弟节点绝对定位在右上角。
+     */
+    <div
+      className="card-wrap"
       data-item-id={item.id}
+      // 键盘流（InboxKeyboard）据此定位卡片、取原文地址
       data-item-url={item.url ?? ''}
     >
-      <article className="card">
+      <Link href={`/item/${item.id}`} className="card-link">
+        <article className="card">
         <div className="card-cover">
           {item.coverAssetId ? (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -98,7 +104,18 @@ export default function ItemCard({ item }: { item: ItemSummary }) {
             </div>
           ) : null}
         </div>
-      </article>
-    </Link>
+        </article>
+      </Link>
+
+      <ItemActions
+        variant="card"
+        item={{
+          id: item.id,
+          status: item.status,
+          hasUrl: Boolean(item.url),
+          collectionId: item.collectionId,
+        }}
+      />
+    </div>
   );
 }

@@ -1394,7 +1394,7 @@ button {
 
 /* ── 收件箱键盘流 ──────────────────────────────────── */
 
-.card-link.is-focused .card {
+.card-wrap.is-focused .card {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft, rgba(15, 118, 110, 0.18));
 }
@@ -1606,4 +1606,127 @@ button {
 
 .nav-inline-input:focus {
   outline: none;
+}
+
+/* ── 条目操作菜单（⋯） ──────────────────────────────── */
+
+.card-wrap {
+  position: relative;
+}
+
+.card-wrap > .item-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* 鼠标悬停或键盘聚焦时才露出来，平时不干扰扫读 */
+.card-wrap:hover > .item-actions,
+.card-wrap.is-focused > .item-actions,
+.card-wrap > .item-actions:focus-within,
+.card-wrap > .item-actions.is-open {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .card-wrap > .item-actions {
+    opacity: 0.75;
+  }
+}
+
+.item-actions.is-reader {
+  position: relative;
+}
+
+.item-actions .btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--fg-muted);
+}
+
+.item-actions .btn-icon:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+.actions-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-pop);
+}
+
+.actions-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.actions-menu button:hover:not(:disabled) {
+  background: var(--bg-sunken);
+}
+
+.actions-menu button:disabled {
+  color: var(--fg-muted);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.actions-menu button.is-danger {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.actions-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+.actions-sub {
+  display: flex;
+  flex-direction: column;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+  margin: 2px 0 2px 6px;
+}
+
+.actions-empty {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.actions-error {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--danger);
+  line-height: 1.5;
 }

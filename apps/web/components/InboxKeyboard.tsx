@@ -77,6 +77,52 @@ export default function InboxKeyboard({ itemCount }: { itemCount: number }) {
     }
   }, [busy, cards, focusAt, index, router]);
 
+  const retry = useCallback(async () => {
+    const list = cards();
+    const id = list[index]?.dataset.itemId;
+    if (!id || busy) return;
+
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/items/${id}/retry`, { method: 'POST' });
+      if (res.ok) router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, cards, index, router]);
+
+  /**
+   * 删除要连按两次 d：不可恢复的操作，单键太容易误触。
+   * 第一次按下只是"上膛"，1 秒内再按才真正删。
+   */
+  const remove = useCallback(async () => {
+    const list = cards();
+    const el = list[index];
+    const id = el?.dataset.itemId;
+    if (!id || busy) return;
+
+    const now = Date.now();
+    const prev = lastKeyRef.current;
+    if (!(prev.key === 'd' && now - prev.at < 1000)) {
+      lastKeyRef.current = { key: 'd', at: now };
+      return;
+    }
+    lastKeyRef.current = { key: '', at: 0 };
+
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/items/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        el.remove();
+        const remain = cards();
+        focusAt(Math.min(index, remain.length - 1));
+        router.refresh();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, cards, focusAt, index, router]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -128,6 +174,16 @@ export default function InboxKeyboard({ itemCount }: { itemCount: number }) {
         void archive();
         return;
       }
+      if (lower === 'r' && current) {
+        e.preventDefault();
+        void retry();
+        return;
+      }
+      if (lower === 'd' && current) {
+        e.preventDefault();
+        void remove();
+        return;
+      }
       if (lower === 'g') {
         const now = Date.now();
         const prev = lastKeyRef.current;
@@ -143,7 +199,7 @@ export default function InboxKeyboard({ itemCount }: { itemCount: number }) {
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [archive, cards, focusAt, helpOpen, index, router]);
+  }, [archive, cards, focusAt, helpOpen, index, remove, retry, router]);
 
   return (
     <>
@@ -169,6 +225,8 @@ export default function InboxKeyboard({ itemCount }: { itemCount: number }) {
                 ['Enter', '打开阅读'],
                 ['O', '新窗口打开原文'],
                 ['E', '归档（移出收件箱）'],
+                ['R', '重新抓取'],
+                ['D D', '删除（连按两次确认）'],
                 ['G G', '回到第一条'],
                 ['?', '显示/隐藏本帮助'],
                 ['+ / −', '阅读页字号（在阅读页生效）'],

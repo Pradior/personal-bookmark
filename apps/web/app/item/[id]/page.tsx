@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import ItemActions from '@/components/ItemActions';
 import ItemTaxonomy from '@/components/ItemTaxonomy';
 import ReaderBody from '@/components/ReaderBody';
 import RetryButton from '@/components/RetryButton';
@@ -90,6 +91,15 @@ export default async function ReaderPage({ params }: Props) {
             原文 ↗
           </a>
         ) : null}
+        <ItemActions
+          variant="reader"
+          item={{
+            id: row.id,
+            status: row.status,
+            hasUrl: Boolean(row.url),
+            collectionId: row.collectionId,
+          }}
+        />
       </header>
 
       {row.fetchState === 'failed' ? (
