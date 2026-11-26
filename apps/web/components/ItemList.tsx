@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ItemSummary } from '@pb/contract';
 import ItemCard from './ItemCard';
+import { useWorkspace } from './WorkspaceContext';
 
 export type ListMode = 'inbox' | 'trash' | 'browse';
 
@@ -26,6 +27,7 @@ export default function ItemList({
   collections?: Collection[];
 }) {
   const router = useRouter();
+  const workspace = useWorkspace();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +117,7 @@ export default function ItemList({
             item={item}
             selected={selected.has(item.id)}
             onToggle={toggle}
+            previewing={workspace?.selectedId === item.id}
           />
         ))}
       </div>

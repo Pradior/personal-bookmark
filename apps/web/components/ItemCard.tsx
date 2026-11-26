@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { ItemSummary } from '@pb/contract';
 import ItemActions from './ItemActions';
+import { useWorkspace } from './WorkspaceContext';
 
 const SOURCE_LABEL: Record<string, string> = {
   wechat: '公众号',
@@ -38,16 +40,24 @@ export default function ItemCard({
   item,
   selected,
   onToggle,
+  previewing,
 }: {
   item: ItemSummary;
   /** 传了 onToggle 才显示勾选框 */
   selected?: boolean;
   onToggle?: (id: string, next: boolean) => void;
+  /** 正在右栏预览的条目 */
+  previewing?: boolean;
 }) {
   const processing = item.fetchState !== 'done' && item.fetchState !== 'failed';
   const failed = item.fetchState === 'failed';
   const read = item.status === 'archived';
   const selectable = Boolean(onToggle);
+
+  const router = useRouter();
+  const workspace = useWorkspace();
+  // 只有在右栏真的存在（>=1280px）时才拦截单击
+  const interceptClick = Boolean(workspace?.wide);
 
   return (
     /**
@@ -56,7 +66,7 @@ export default function ItemCard({
      * 所以勾选框与菜单都作为兄弟节点绝对定位。
      */
     <div
-      className={`card-wrap${selected ? ' is-selected' : ''}`}
+      className={`card-wrap${selected ? ' is-selected' : ''}${previewing ? ' is-previewing' : ''}`}
       data-item-id={item.id}
       // 键盘流（InboxKeyboard）据此定位卡片、取原文地址
       data-item-url={item.url ?? ''}
@@ -71,7 +81,22 @@ export default function ItemCard({
           />
         </label>
       ) : null}
-      <Link href={`/item/${item.id}`} className="card-link">
+      <Link
+        href={`/item/${item.id}`}
+        className="card-link"
+        onClick={(e) => {
+          if (!interceptClick) return; // 窄屏：保持默认整页跳转
+          // 带修饰键 / 中键点击 = 用户想开新标签页，别拦
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          workspace?.select(item.id);
+        }}
+        onDoubleClick={(e) => {
+          if (!interceptClick) return;
+          e.preventDefault();
+          router.push(`/item/${item.id}`);
+        }}
+      >
         <article className="card">
         <div className="card-cover">
           {item.coverAssetId ? (

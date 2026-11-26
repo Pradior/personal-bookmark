@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useWorkspace } from './WorkspaceContext';
 
 /**
  * 收件箱键盘流（SPEC §9.7）
@@ -19,6 +20,7 @@ import { useRouter } from 'next/navigation';
  */
 export default function InboxKeyboard({ itemCount }: { itemCount: number }) {
   const router = useRouter();
+  const workspace = useWorkspace();
   const [index, setIndex] = useState(-1);
   const [helpOpen, setHelpOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,8 +42,11 @@ export default function InboxKeyboard({ itemCount }: { itemCount: number }) {
       el.classList.add('is-focused');
       el.scrollIntoView({ block: 'nearest' });
       setIndex(clamped);
+      // 宽屏下 J/K 直接在右栏预览，符合 feed 阅读器的习惯
+      const id = el.dataset.itemId;
+      if (workspace?.wide && id) workspace.select(id);
     },
-    [cards],
+    [cards, workspace],
   );
 
   // 列表刷新后（新条目进来）保持在同一条上，别跳走

@@ -1,6 +1,9 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import DetailPane from './DetailPane';
 import ThemeSwitch from './ThemeSwitch';
-import { IconLayers } from './icons';
+import { WorkspaceProvider } from './WorkspaceContext';
 
 type Props = {
   title: string;
@@ -13,10 +16,13 @@ type Props = {
 /**
  * 列表区 + 阅读区骨架（SPEC §9.2 / §9.4 / §9.9）。
  * 三栏断点由 .shell 的 grid 决定，这里只负责两栏的内容。
+ *
+ * 是客户端组件的唯一原因：右栏预览需要"当前选中哪一条"这个状态，
+ * 而选中来自列表点击。状态必须活在两栏的共同祖先里。
  */
 export default function ListPage({ title, dbReady, children, searchValue }: Props) {
   return (
-    <>
+    <WorkspaceProvider>
       <main className="list-pane">
         <div className="topbar">
           <span className="topbar-title">{title}</span>
@@ -51,14 +57,8 @@ export default function ListPage({ title, dbReady, children, searchValue }: Prop
       </main>
 
       <aside className="detail-pane" aria-label="阅读区">
-        <div className="detail-empty">
-          <IconLayers width={22} height={22} />
-          <span>选中条目后在这里阅读</span>
-          <span className="subtle" style={{ fontSize: 12 }}>
-            窄屏会改用独立阅读页
-          </span>
-        </div>
+        <DetailPane />
       </aside>
-    </>
+    </WorkspaceProvider>
   );
 }
