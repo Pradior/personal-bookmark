@@ -163,6 +163,43 @@ console.log('\n[meta 兜底：标题后缀与散落图片]');
   }
 }
 
+console.log('\n[扩展路径：从渲染后的 DOM 抽]');
+{
+  // 模拟扩展送来的、已经渲染完的详情页
+  const hydrated = `<html><head>
+      <meta property="og:title" content="渲染后的笔记标题 - 小红书" />
+      <meta property="og:type" content="article" />
+    </head><body>
+      <div id="detail-title">渲染后的笔记标题</div>
+      <div id="detail-desc"><span>第一段正文内容，够长了。</span><br><span>第二段正文内容。</span></div>
+      <div class="author-wrapper"><span class="name">渲染后的作者</span></div>
+      <div class="swiper-slide"><img src="https://sns-webpic-qc.xhscdn.com/2026/a.webp"></div>
+      <div class="swiper-slide"><img src="https://sns-webpic-qc.xhscdn.com/2026/b.webp"></div>
+      <div class="note-slider"><img src="https://sns-webpic-qc.xhscdn.com/2026/a.webp"></div>
+      <img src="https://sns-avatar-qc.xhscdn.com/avatar/xxx.jpg">
+    </body></html>`;
+
+  const r = await xhsAdapter.capture({
+    url: new URL('https://www.xiaohongshu.com/explore/rendered'),
+    html: hydrated,
+    cookie: 'a=1',
+  });
+
+  if (!r) {
+    console.log('  FAIL 渲染后的 DOM 应该能解析出来');
+  } else {
+    eq('走的是 dom 路径', r.meta.via, 'dom');
+    eq('标题取自 DOM', r.title, '渲染后的笔记标题');
+    eq('作者取自 DOM', r.author, '渲染后的作者');
+    truthy('正文包含两段', r.contentText.includes('第一段') && r.contentText.includes('第二段'));
+    eq('图片去重后 2 张', r.images.length, 2);
+    truthy('没把头像算进去', !r.images.some((i) => i.url.includes('avatar')));
+    eq('HTML 占位符数量一致', (r.contentHtml.match(/data-pb-img="/g) ?? []).length, 2);
+    eq('封面取第一张图', r.coverUrl?.includes('/a.webp'), true);
+    eq('图片带上 cookie 去下载', r.images[0]?.cookie, 'a=1');
+  }
+}
+
 console.log('\n[降级：什么都没有 → 返回 null]');
 const empty = await xhsAdapter.capture({
   url: new URL('https://www.xiaohongshu.com/explore/none'),

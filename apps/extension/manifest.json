@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "个人bookmark 采集器",
+  "version": "0.1.0",
+  "description": "把当前页面（渲染后的完整 DOM，含登录态内容）保存到自托管的 个人bookmark。",
+  "minimum_chrome_version": "116",
+
+  "permissions": ["activeTab", "scripting", "storage"],
+
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "保存到 个人bookmark"
+  },
+
+  "background": {
+    "service_worker": "sw.js"
+  }
+}

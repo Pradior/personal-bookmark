@@ -12,6 +12,7 @@ import * as cheerio from 'cheerio';
 import { detectBlock, fetchHtml, FetchError, DESKTOP_UA } from '../fetcher';
 import type { Adapter, CaptureContext, CaptureImage, CaptureResult } from './types';
 import { extractJsonObject, metaContent, normalizeText } from './shared';
+import { extractFromDom } from './xhs-dom';
 
 type XhsNote = {
   title?: string;
@@ -167,6 +168,34 @@ export const xhsAdapter: Adapter = {
     if (isEmptyNote(note)) {
       warnings.push('页面里的 note 是空壳（没有标题、正文和图片）');
       note = null;
+    }
+
+    // ── 扩展路径：从渲染后的 DOM 里抽（小红书内容只在这里有）──────
+    const dom = extractFromDom($, {
+      cookie: ctx.cookie,
+      userAgent: ctx.userAgent ?? DESKTOP_UA,
+      referer: 'https://www.xiaohongshu.com/',
+      fallbackTitle: stripSiteSuffix(metaContent($, 'meta[property="og:title"]')),
+      fallbackDesc: metaContent($, 'meta[property="og:description"]'),
+    });
+    if (dom) {
+      if (dom.images.length === 0) warnings.push('页面里没找到图片（可能还没加载完，滚动一下再试）');
+      return {
+        type: 'article',
+        source: 'xhs',
+        title: dom.title,
+        author: dom.author,
+        siteName: '小红书',
+        excerpt: dom.desc?.slice(0, 120) || undefined,
+        contentHtml: dom.contentHtml,
+        contentText: dom.contentText,
+        coverUrl: dom.images[0]?.url,
+        coverReferer: 'https://www.xiaohongshu.com/',
+        images: dom.images,
+        rawSnapshot: html,
+        meta: { finalUrl, imageCount: dom.images.length, via: 'dom' },
+        warnings,
+      };
     }
 
     // 没有笔记数据 + 页面出现登录提示 → 明确告诉用户原因，

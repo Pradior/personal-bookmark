@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>保存到 个人bookmark</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #1c1b19;
+        --fg-muted: #6b6862;
+        --border: #e6e2da;
+        --bg: #fbfaf8;
+        --bg-elev: #ffffff;
+        --accent: #0f766e;
+        --danger: #b42318;
+        --ok: #0f766e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #edeae4;
+          --fg-muted: #a29e96;
+          --border: #2a2825;
+          --bg: #151412;
+          --bg-elev: #1d1c19;
+          --accent: #2dd4bf;
+          --danger: #f97066;
+          --ok: #2dd4bf;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 14px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Microsoft YaHei', sans-serif;
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .sub {
+        margin: 0 0 12px;
+        color: var(--fg-muted);
+        font-size: 11.5px;
+      }
+      label {
+        display: block;
+        margin: 10px 0 4px;
+        color: var(--fg-muted);
+        font-size: 11.5px;
+      }
+      input[type='text'],
+      input[type='password'],
+      input[type='url'] {
+        width: 100%;
+        height: 30px;
+        padding: 0 8px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--bg-elev);
+        color: var(--fg);
+        font: inherit;
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .row input {
+        flex: 1;
+        min-width: 0;
+      }
+      button {
+        height: 30px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--bg-elev);
+        color: var(--fg);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button.primary {
+        border-color: transparent;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 500;
+      }
+      #save {
+        width: 100%;
+        height: 36px;
+        margin-top: 14px;
+        font-size: 13px;
+      }
+      button[disabled] {
+        opacity: 0.55;
+        cursor: default;
+      }
+      .check {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin-top: 12px;
+        color: var(--fg-muted);
+        font-size: 11.5px;
+        line-height: 1.5;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        line-height: 1.55;
+        word-break: break-all;
+      }
+      .status.ok {
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+      .status.err {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      .status a {
+        color: inherit;
+      }
+      .hint {
+        margin-top: 10px;
+        color: var(--fg-muted);
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      code {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 10.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>保存到 个人bookmark</h1>
+    <p class="sub" id="tab-title">读取当前标签页…</p>
+
+    <label for="server">服务器地址</label>
+    <input id="server" type="url" placeholder="http://192.168.1.10:3081" />
+
+    <label for="pat">访问令牌（PAT）</label>
+    <div class="row">
+      <input id="pat" type="password" placeholder="pb_..." />
+      <button id="test" type="button">测试</button>
+    </div>
+
+    <label class="check">
+      <input id="sendHtml" type="checkbox" checked />
+      <span>
+        发送渲染后的整页 HTML（<b>强烈建议开启</b>）
+        <br />
+        小红书/抖音的内容是 JS 渲染的，只发链接服务端拿不到图和正文。
+      </span>
+    </label>
+
+    <button id="save" class="primary" type="button">保存当前页面</button>
+
+    <div id="status" class="status" hidden></div>
+
+    <p class="hint">
+      令牌在服务器的「设置 → 访问令牌」里新建。服务器地址填浏览器能访问到的那个
+      （含端口，如 <code>:3081</code>）。
+    </p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

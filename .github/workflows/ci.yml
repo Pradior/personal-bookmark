@@ -71,6 +71,9 @@ jobs:
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 
+      - name: 校验浏览器扩展（manifest / 脚本语法）
+        run: pnpm check:ext
+
       - name: 构建 Web
         run: pnpm --filter @pb/web build
         env:
