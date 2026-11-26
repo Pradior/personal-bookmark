@@ -68,6 +68,9 @@ jobs:
       - name: 自检：站点凭据加解密
         run: pnpm --filter @pb/core check:credential
 
+      - name: 自检：客户端提示合并
+        run: pnpm --filter @pb/core check:hints
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 

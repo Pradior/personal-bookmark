@@ -24,9 +24,10 @@ function describeNetworkError(err, server) {
   return msg;
 }
 
-async function handleCapture({ server, pat, url, html, overwrite }) {
+async function handleCapture({ server, pat, url, html, hint, overwrite }) {
   const body = { url, client: 'extension' };
   if (typeof html === 'string' && html.length > 200) body.html = html;
+  if (hint && (hint.title || (hint.images && hint.images.length > 0))) body.hint = hint;
   if (overwrite === true && body.html) body.overwrite = true;
 
   let res;

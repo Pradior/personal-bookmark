@@ -70,6 +70,19 @@ export default async function ReaderPage({ params }: Props) {
             <strong>正在处理…</strong> 正文和图片还在下载，稍等片刻刷新本页。
           </div>
         </div>
+      ) : row.fetchError ? (
+        // 抓取"成功"但有警告（图片缺失、只拿到摘要等）—— 把真实原因说出来，
+        // 否则用户只看到内容不全却不知道该怎么补
+        <div className="banner" style={{ margin: '0 0 16px' }}>
+          <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+            <strong>内容可能不完整：</strong>
+            {row.fetchError}
+            <br />
+            <span className="subtle">
+              用浏览器扩展在这个页面再保存一次（勾选「已收藏过则覆盖更新」）可以补全。
+            </span>
+          </div>
+        </div>
       ) : null}
 
       <div className="reader-body">

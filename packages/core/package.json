@@ -14,7 +14,8 @@
     "check:wechat": "tsx ./test/wechat.check.ts",
     "check:xhs": "tsx ./test/xhs.check.ts",
     "check:douyin": "tsx ./test/douyin.check.ts",
-    "check:credential": "tsx ./test/credential.check.ts"
+    "check:credential": "tsx ./test/credential.check.ts",
+    "check:hints": "tsx ./test/hints.check.ts"
   },
   "dependencies": {
     "cheerio": "^1.0.0"

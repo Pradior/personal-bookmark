@@ -71,7 +71,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             coverAssetId: null,
             fetchedAt: null,
             updatedAt: new Date(),
-            meta: { clientHtml: body.html, client: body.client, overwrittenAt: new Date().toISOString() },
+            meta: {
+              clientHtml: body.html,
+              client: body.client,
+              hint: body.hint,
+              overwrittenAt: new Date().toISOString(),
+            },
           })
           .where(eq(item.id, dup[0].id));
 
@@ -116,8 +121,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         fetchState: 'queued',
         fetchedAt: null,
         meta: hasClientHtml
-          ? { clientHtml: body.html, client: body.client }
-          : { client: body.client },
+          ? { clientHtml: body.html, client: body.client, hint: body.hint }
+          : { client: body.client, hint: body.hint },
       })
       .returning({ id: item.id });
 

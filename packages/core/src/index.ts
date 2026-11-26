@@ -47,3 +47,5 @@ export {
   type ImageMap,
   type SanitizedImage,
 } from './sanitize';
+
+export { applyHints, type CaptureHints } from './hints';

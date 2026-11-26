@@ -66,13 +66,66 @@ async function currentTab() {
   return tab;
 }
 
-/** 注入到页面里执行：把渲染后的 DOM 和最终 URL 取回来 */
-function grabPage() {
+/**
+ * 注入到页面里执行：取渲染后的 DOM + 按尺寸筛出的图片。
+ *
+ * 关键点：不能依赖 CSS 类名。小红书改版频繁，但"配图的 naturalWidth 很大、
+ * 图标很小"这件事不会变。所以用渲染尺寸过滤，图标/头像/角标天然被排除。
+ *
+ * 另外要先逼出懒加载：配图往往要滚动到位置才变成真 <img>。
+ */
+async function grabPage() {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // 1) 触发懒加载
+  for (const img of Array.from(document.images)) {
+    try {
+      img.loading = 'eager';
+      img.decoding = 'sync';
+    } catch {
+      /* 忽略只读属性 */
+    }
+  }
+  const startY = window.scrollY;
+  const docHeight = Math.max(
+    document.body?.scrollHeight ?? 0,
+    document.documentElement?.scrollHeight ?? 0,
+  );
+  // 分几步往下滚，让每一屏的图都有机会加载
+  for (let y = 0; y < docHeight; y += Math.max(400, window.innerHeight * 0.8)) {
+    window.scrollTo(0, y);
+    await sleep(120);
+  }
+  window.scrollTo(0, startY);
+  await sleep(250);
+
+  // 2) 按渲染尺寸筛图（MIN 300px），去重、保序
+  const MIN = 300;
+  const seen = new Set();
+  const images = [];
+  for (const img of Array.from(document.images)) {
+    const src = img.currentSrc || img.src;
+    if (!src || !/^https?:/i.test(src)) continue;
+    if (img.naturalWidth < MIN || img.naturalHeight < MIN) continue;
+    if (seen.has(src)) continue;
+    seen.add(src);
+    images.push(src);
+    if (images.length >= 40) break;
+  }
+
   return {
     url: location.href,
     title: document.title,
     html: document.documentElement.outerHTML,
+    images,
   };
+}
+
+/** 去掉标题尾巴上的站名，例如 "xxx - 小红书" */
+function stripSiteSuffix(title) {
+  return String(title ?? '')
+    .replace(/\s*[-|–]\s*(小红书|抖音|知乎|微博|B站|bilibili)\s*$/u, '')
+    .trim();
 }
 
 async function doSave() {
@@ -118,6 +171,11 @@ async function doSave() {
       pat,
       url: page.url,
       html,
+      // 页面里按渲染尺寸筛出来的图片 —— 懒加载的配图主要靠这个补进来
+      hint: {
+        title: stripSiteSuffix(page.title),
+        images: page.images ?? [],
+      },
       // 只有真的带了 HTML 才允许覆盖，否则会把已有正文冲成空壳
       overwrite: Boolean(html) && $('overwrite').checked,
     });

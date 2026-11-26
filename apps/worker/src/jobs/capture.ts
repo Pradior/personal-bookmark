@@ -8,10 +8,12 @@ import { gzipSync } from 'node:zlib';
 import { eq } from 'drizzle-orm';
 import { item, snapshot, type Database } from '@pb/db';
 import {
+  applyHints,
   captureWithFallback,
   FetchError,
   htmlToText,
   sanitizeContent,
+  type CaptureHints,
   type ImageMap,
 } from '@pb/core';
 import { ingestImage } from '../assets';
@@ -69,7 +71,7 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       console.log(`[capture] 使用站点凭据: ${credential.domain}`);
     }
 
-    const { result, tried } = await captureWithFallback({
+    const { result: baseResult, tried } = await captureWithFallback({
       url: new URL(url),
       html: clientHtml,
       cookie: credential?.cookie,
@@ -77,13 +79,27 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       referer: credential?.referer,
     });
 
-    if (!result) {
+    if (!baseResult) {
       await setState({
         fetchState: 'failed',
         fetchError: `解析不出正文（adapter: ${tried.join(' → ')}）。可以试试用浏览器打开后粘贴正文保存。`,
         fetchedAt: new Date(),
       });
       return;
+    }
+
+    // 把扩展在页面里按渲染尺寸筛出来的图片并进来。
+    // 小红书的配图是懒加载的，服务端 HTML 里没有；扩展抓 DOM 时也可能没滚到底。
+    const hint = (meta.hint ?? undefined) as CaptureHints | undefined;
+    const result = applyHints(baseResult, hint, {
+      referer: credential?.referer,
+      userAgent: credential?.userAgent,
+      cookie: credential?.cookie,
+    });
+    if (hint?.images?.length) {
+      console.log(
+        `[capture] 客户端提示图片 ${hint.images.length} 张，合并后共 ${result.images.length} 张`,
+      );
     }
 
     // ── 图片 ────────────────────────────────────────────

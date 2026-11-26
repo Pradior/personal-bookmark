@@ -28,6 +28,15 @@ export const CaptureRequest = z.object({
       excerpt: z.string().max(2000).optional(),
       coverUrl: z.string().max(2048).optional(),
       noteHtml: z.string().max(2_000_000).optional(),
+      /**
+       * 客户端在页面里按**渲染尺寸**筛出来的图片地址（≥300px）。
+       *
+       * 为什么需要：小红书这类 SPA 的配图是懒加载的，服务端拿到的 HTML
+       * 里没有；扩展抓 DOM 时若页面没滚到底，图片也可能还没变成 <img>。
+       * 在页面上下文里能读到 naturalWidth/naturalHeight —— 用它过滤，
+       * 图标、头像、角标天然被排除，也不依赖任何 CSS 类名。
+       */
+      images: z.array(z.string().max(2048)).max(40).optional(),
     })
     .optional(),
 
