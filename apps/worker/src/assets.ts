@@ -40,11 +40,40 @@ const EXT: Record<string, string> = {
   'image/gif': 'gif',
   'image/avif': 'avif',
   'image/svg+xml': 'svg',
+  'image/svg': 'svg',
 };
 
 function extFor(mime: string): string {
   return EXT[mime.split(';')[0]?.trim().toLowerCase() ?? ''] ?? 'bin';
 }
+
+/**
+ * sharp 的 metadata().format 给的是 'svg'，直接拼成 `image/svg` 是错的
+ * （浏览器只认 `image/svg+xml`，否则拒绝渲染 → 裂图）。
+ * 这里统一把格式名规范化成正确的 MIME。
+ */
+function normalizeMime(format: string | undefined, fallback: string): string {
+  const f = (format ?? '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    svg: 'image/svg+xml',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    avif: 'image/avif',
+    heif: 'image/heif',
+    tiff: 'image/tiff',
+  };
+  return map[f] ?? (fallback.split(';')[0]?.trim() || 'application/octet-stream');
+}
+
+/**
+ * 太小的图大概率是图标、头像、角标，不是正文配图。
+ * 小红书空壳页里唯一的 xhscdn 图片就是一个 32×32 的搜索图标，
+ * 之前被当成笔记配图存了下来（见 2026-11-26 诊断）。
+ */
+const MIN_EDGE = Number(process.env.MIN_ASSET_EDGE ?? 120);
 
 /**
  * 抓取一张图 → 派生两档 → 落盘 → 写库。
@@ -98,9 +127,17 @@ export async function ingestImage(
     // 3) 探查源图
     const probe = sharp(res.body, { animated: true });
     const meta = await probe.metadata();
-    const sourceMime = meta.format ? `image/${meta.format}` : res.contentType || 'image/jpeg';
+    const sourceMime = normalizeMime(meta.format, res.contentType);
     const animated = (meta.pages ?? 1) > 1;
     const isSvg = sourceMime.includes('svg');
+
+    // 图标/头像/角标一律跳过：比这还小的东西不会是正文配图
+    const w0 = meta.width ?? 0;
+    const h0 = meta.height ?? 0;
+    if (!animated && w0 > 0 && h0 > 0 && w0 < MIN_EDGE && h0 < MIN_EDGE) {
+      console.log(`[assets] 跳过小图 ${w0}×${h0}: ${url.slice(0, 80)}`);
+      return null;
+    }
 
     const assetId = randomUUID();
     const bucket = sha256.slice(0, 2);

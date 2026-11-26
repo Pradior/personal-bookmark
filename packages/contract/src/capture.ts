@@ -34,6 +34,15 @@ export const CaptureRequest = z.object({
   collectionId: z.string().uuid().optional(),
   tags: z.array(z.string().min(1).max(64)).max(20).optional(),
 
+  /**
+   * 命中已存在的条目时，用这次的内容覆盖它（而不是返回 409）。
+   *
+   * 用途：先前用「粘贴链接」存的小红书条目只有空壳，后来用扩展抓到了完整
+   * DOM —— 没有覆盖就只能先删再存，而删除接口很容易误操作。
+   * 只在带了 html 时才允许覆盖，避免"只发链接"把已有正文冲掉。
+   */
+  overwrite: z.boolean().default(false),
+
   client: z.enum(['extension', 'pwa', 'ios', 'api', 'manual']).default('api'),
 });
 export type CaptureRequest = z.infer<typeof CaptureRequest>;

@@ -43,6 +43,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const db = getDb();
 
+    // 有客户端 HTML 就不用等回源；否则 worker 去抓
+    const hasClientHtml = typeof body.html === 'string' && body.html.length > 200;
+
     // 精确去重：同一条链接不重复入库
     const dup = await db
       .select({ id: item.id })
@@ -51,6 +54,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .limit(1);
 
     if (dup[0]) {
+      // 带 HTML 的覆盖请求：把旧条目的内容清空后用新 HTML 重抓。
+      // 这是"先用粘贴链接存了空壳、后来用扩展抓到完整页面"的补救路径。
+      if (body.overwrite && hasClientHtml) {
+        await db
+          .update(item)
+          .set({
+            fetchState: 'queued',
+            fetchError: null,
+            title: null,
+            author: null,
+            excerpt: null,
+            contentHtml: null,
+            contentText: null,
+            wordCount: 0,
+            coverAssetId: null,
+            fetchedAt: null,
+            updatedAt: new Date(),
+            meta: { clientHtml: body.html, client: body.client, overwrittenAt: new Date().toISOString() },
+          })
+          .where(eq(item.id, dup[0].id));
+
+        let overwriteJobId: string | null = null;
+        try {
+          overwriteJobId = await enqueueCapture(dup[0].id);
+        } catch (err) {
+          console.error('[capture] 覆盖入队失败', err);
+        }
+
+        const overwritten: CaptureResponse = {
+          itemId: dup[0].id,
+          jobId: overwriteJobId,
+          status: 'queued',
+          duplicate: false,
+        };
+        return NextResponse.json(overwritten, { status: 202 });
+      }
+
       const payload: CaptureResponse = {
         itemId: dup[0].id,
         jobId: null,
@@ -60,9 +100,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       };
       return NextResponse.json(payload, { status: 409 });
     }
-
-    // 有客户端 HTML 就不用等回源；否则 worker 去抓
-    const hasClientHtml = typeof body.html === 'string' && body.html.length > 200;
 
     const [inserted] = await db
       .insert(item)

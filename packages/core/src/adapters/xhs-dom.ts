@@ -44,6 +44,16 @@ function firstText($: cheerio.CheerioAPI, selectors: string[]): string | undefin
   return undefined;
 }
 
+const MIN_ATTR_EDGE = 120;
+
+/** 站点自己的静态资源（图标、logo）不能当配图 */
+function isSiteAsset(url: string): boolean {
+  if (/^https?:\/\/fe-static\./i.test(url)) return true;
+  if (url.includes('/resource/')) return true;
+  if (/\.svg$/i.test(url.split(/[?!]/, 1)[0] ?? url)) return true;
+  return false;
+}
+
 function collectImages($: cheerio.CheerioAPI, limit = 24): { url: string; alt?: string }[] {
   const seen = new Set<string>();
   const out: { url: string; alt?: string }[] = [];
@@ -60,8 +70,14 @@ function collectImages($: cheerio.CheerioAPI, limit = 24): { url: string; alt?: 
 
       const url = raw.trim();
       if (!/^https?:\/\//i.test(url)) continue;
-      if (!url.includes('xhscdn.com')) continue; // 头像、图标之类的别要
+      if (!url.includes('xhscdn.com')) continue; // 站外图不要
+      if (isSiteAsset(url)) continue; // 图标/logo 不要
       if (seen.has(url)) continue;
+
+      // 元素上标了尺寸且很小 → 图标，跳过
+      const w = Number(el.attribs?.width ?? '0');
+      const h = Number(el.attribs?.height ?? '0');
+      if (w > 0 && h > 0 && w < MIN_ATTR_EDGE && h < MIN_ATTR_EDGE) continue;
 
       seen.add(url);
       out.push({ url, alt: el.attribs?.alt });

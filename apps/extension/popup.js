@@ -6,7 +6,7 @@
  *   拿到该站点的 host permission 后不受 CORS 约束。所以统一由 SW 发。
  */
 
-const DEFAULTS = { server: '', pat: '', sendHtml: true };
+const DEFAULTS = { server: '', pat: '', sendHtml: true, overwrite: true };
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,6 +28,7 @@ async function loadConfig() {
   $('server').value = stored.server ?? '';
   $('pat').value = stored.pat ?? '';
   $('sendHtml').checked = stored.sendHtml !== false;
+  $('overwrite').checked = stored.overwrite !== false;
 }
 
 async function saveConfig() {
@@ -35,6 +36,7 @@ async function saveConfig() {
     server: $('server').value.trim().replace(/\/+$/, ''),
     pat: $('pat').value.trim(),
     sendHtml: $('sendHtml').checked,
+    overwrite: $('overwrite').checked,
   });
 }
 
@@ -116,6 +118,8 @@ async function doSave() {
       pat,
       url: page.url,
       html,
+      // 只有真的带了 HTML 才允许覆盖，否则会把已有正文冲成空壳
+      overwrite: Boolean(html) && $('overwrite').checked,
     });
 
     if (!res?.ok) {

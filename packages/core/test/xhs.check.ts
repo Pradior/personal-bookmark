@@ -163,6 +163,40 @@ console.log('\n[meta 兜底：标题后缀与散落图片]');
   }
 }
 
+/**
+ * 真机事故（2026-11-26）：走 meta 兜底时把小红书自己的 UI 图标
+ * （fe-static.xhscdn.com 上的 32×32 搜索图标）当成了笔记配图存下来，
+ * 结果条目里只有一张裂图。
+ */
+console.log('\n[meta 兜底：不能把站点静态资源当配图]');
+{
+  const shellHtml = `<html><head>
+      <meta property="og:title" content="翡翠台面包超人新版开播 - 小红书" />
+      <meta property="og:description" content="粤语新单元" />
+    </head><body>
+      <link rel="icon" href="https://fe-static.xhscdn.com/formula-static/xhs-pc-web/public/resource/svg/standardSearchIcon.8bb9dd9c.svg">
+      <img src="https://fe-static.xhscdn.com/formula-static/xhs-pc-web/public/resource/svg/logo.svg">
+      <img src="https://sns-webpic-qc.xhscdn.com/2026/real-note-image.webp">
+    </body></html>`;
+
+  const urls = __internal.collectImageUrls(shellHtml);
+  eq('只剩真正的笔记图', urls.length, 1);
+  truthy('排除了 fe-static 静态资源', !urls.some((u) => u.includes('fe-static')));
+  truthy('排除了 svg 图标', !urls.some((u) => u.endsWith('.svg')));
+
+  const r = await xhsAdapter.capture({
+    url: new URL('https://www.xiaohongshu.com/explore/shell'),
+    html: shellHtml,
+  });
+  if (!r) {
+    console.log('  FAIL 应该能返回结果（有标题和一张真图）');
+  } else {
+    eq('图片只收真图', r.images.length, 1);
+    eq('封面是真图', r.coverUrl?.includes('real-note-image'), true);
+    truthy('没有把站点静态资源算进去', !r.images.some((i) => i.url.includes('fe-static')));
+  }
+}
+
 console.log('\n[扩展路径：从渲染后的 DOM 抽]');
 {
   // 模拟扩展送来的、已经渲染完的详情页

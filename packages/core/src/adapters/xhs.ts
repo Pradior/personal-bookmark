@@ -99,9 +99,17 @@ function collectImageUrls(html: string, limit = 12): string[] {
     url = url.replace(/\\u002[fF]/g, '/').replace(/[),.;]+$/, '');
     if (!/^https?:\/\//i.test(url)) continue;
 
+    // 小红书的静态资源也在 xhscdn 上（fe-static 域名、/resource/svg/ 路径），
+    // 之前就是这样把一个 32×32 的搜索图标当成笔记配图存了下来。
+    if (/^https?:\/\/fe-static\./i.test(url)) continue;
+    if (url.includes('/resource/')) continue;
+
     // 小红书的图片地址常带处理后缀：aaa.jpg!nd_dft_wlteh_webp_3
     // 所以判扩展名时要先切掉 ? 和 ! 之后的部分
     const pathPart = url.split(/[?!]/, 1)[0] ?? url;
+    // SVG 一律不要：它不是文章配图，而且转码/渲染都麻烦
+    if (/\.svg$/i.test(pathPart)) continue;
+
     const looksLikeImage =
       /\.(jpe?g|png|webp|avif|gif)$/i.test(pathPart) || /\/img\//i.test(url);
     if (!looksLikeImage) continue;
@@ -125,6 +133,9 @@ export const xhsAdapter: Adapter = {
   async capture(ctx: CaptureContext): Promise<CaptureResult | null> {
     let html = ctx.html;
     let finalUrl = ctx.url.toString();
+    // 没有客户端 HTML = 服务端自己抓的。小红书这种 SPA，服务端只能拿到空壳，
+    // 所以要提示用户改用扩展 —— 但如果是扩展送的 HTML，就别说这句。
+    const serverFetched = !ctx.html;
 
     if (!html) {
       const res = await fetchHtml(ctx.url.toString(), {
@@ -180,6 +191,9 @@ export const xhsAdapter: Adapter = {
     });
     if (dom) {
       if (dom.images.length === 0) warnings.push('页面里没找到图片（可能还没加载完，滚动一下再试）');
+      if (serverFetched) {
+        warnings.push('服务端抓到的可能是空壳页，内容不完整。用浏览器扩展保存这一页能拿到全部正文和图片。');
+      }
       return {
         type: 'article',
         source: 'xhs',
