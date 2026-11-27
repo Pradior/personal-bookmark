@@ -128,10 +128,65 @@ sudo docker compose logs -f pb-web
 sudo docker compose pull && sudo docker compose up -d
 ```
 
-或把 `scripts/nas-deploy.sh` 拷到部署目录，一条命令搞定（含健康检查等待）。
-
 > 习惯：先在 GitHub → **Actions** 看一眼那次提交的 `images` job 是绿的，再 pull。
 > 那个 job 只有在 verify 全过之后才会跑，所以绿了说明镜像里一定是能跑的代码。
+
+#### 拉不动时：粘这段重试（当前目录只有 compose，没有源码）
+
+镜像部署的目录里**没有 `scripts/`**（那是仓库里的东西）。所以排错用这段内联命令：
+
+```bash
+cd /volume1/docker/personal-bookmark
+sudo sh -c '
+  i=1; d=3
+  while [ $i -le 5 ]; do
+    echo "==> 第 $i/5 次拉取"
+    if docker compose pull pb-web pb-worker && docker compose up -d; then
+      echo "==> 完成"; exit 0
+    fi
+    echo "    失败，${d}s 后重试"
+    sleep $d; d=$((d*2)); i=$((i+1))
+  done
+  echo "==> 5 次都失败：是网络问题，不是镜像问题"
+  exit 1
+'
+```
+
+先单独判断网络（这一步能立刻区分"连不上"和"镜像不存在"）：
+
+```bash
+curl -sS -o /dev/null -w 'ghcr 状态码 %{http_code}\n' --max-time 10 https://ghcr.io/v2/ \
+  || echo '连不上 ghcr.io'
+```
+
+想把它留成文件，下次直接用：
+
+```bash
+cd /volume1/docker/personal-bookmark
+cat > pull-retry.sh <<'EOF'
+#!/bin/sh
+i=1; d=3
+while [ $i -le 5 ]; do
+  echo "==> 第 $i/5 次拉取"
+  if docker compose pull pb-web pb-worker && docker compose up -d; then
+    echo "==> 完成"; exit 0
+  fi
+  echo "    失败，${d}s 后重试"; sleep $d; d=$((d*2)); i=$((i+1))
+done
+echo "==> 5 次都失败：是网络问题，不是镜像问题"; exit 1
+EOF
+chmod +x pull-retry.sh
+# 以后：sudo ./pull-retry.sh
+```
+
+仍然失败的三种出路（详见 §7 排错对照表）：
+
+```bash
+# ① 给 dockerd 配代理（同网段有能翻墙的机器时最有效）
+# ② .env 里改 IMAGE_REPO 指向能连上的镜像源
+# ③ 先用本地已有镜像，不阻塞使用：
+sudo docker compose up -d --pull never
+```
 
 ## 2. 拿管理员密码
 
@@ -216,7 +271,7 @@ sudo docker compose down                  # 停止（保留数据）
 | 卡片一直「正在抓取」 | worker 异常 | `sudo docker compose logs pb-worker` |
 | `pb-web` 反复重启 | 迁移失败 | 看日志里 migrate 的输出，确认 `DATABASE_URL` 与 pb-db 健康 |
 | `pull` 报 `registry-1.docker.io`: EOF | Docker Hub 连不上（pb-db 镜像来自那里） | 只拉应用镜像：`docker compose pull pb-web pb-worker`；或在 UGOS Docker → 设置 → 加速器 配镜像源。compose 里 `pb-db` 已设 `pull_policy: missing`，正常情况下不会再碰它 |
-| `pull` 报 `ghcr.io/v2`: TLS handshake timeout | NAS 连不上 GitHub Container Registry（间歇性封锁，与镜像无关——CI 一直在推） | 用 `sudo sh scripts/nas-pull.sh`：先探连通性，再按 3s→6s→12s 退避重试 5 次。仍失败见下一行 |
+| `pull` 报 `ghcr.io/v2`: TLS handshake timeout | NAS 连不上 GitHub Container Registry（间歇性封锁，与镜像无关——CI 一直在推） | 见 §1.5 的「拉不动时」：内联重试脚本（不需要源码），先 `curl https://ghcr.io/v2/` 确认是网络问题。仍失败见下一行 |
 | 重试多次仍拉不下来 | 该时段网络彻底不通 | 三条路，按成本排序：① 给 NAS 配代理（见下方 dockerd 配置）；② 改 `.env` 里的 `IMAGE_REPO` 指向可用镜像源；③ 先用本地已有镜像 `docker compose up -d --pull never` 不阻塞使用 |
 
 **dockerd 走局域网代理**（如果同一网段有一台能翻墙的机器）：

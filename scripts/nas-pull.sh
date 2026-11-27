@@ -3,6 +3,9 @@
 #
 #   sudo sh scripts/nas-pull.sh
 #
+# ⚠️ 这个文件在**仓库**里。如果你的部署目录只有 docker-compose.yml + .env
+#    （镜像部署，没 clone 源码），用 docs/deploy-ugreen.md §1.5 里那段内联命令。
+#
 # 为什么需要它：ghcr.io 在国内经常间歇性 TLS handshake timeout。
 # 单次 `docker compose pull` 失败后往往只是"这次运气不好"，
 # 但它不会告诉你到底是网络问题还是镜像不存在，也不知道该重试几次。
