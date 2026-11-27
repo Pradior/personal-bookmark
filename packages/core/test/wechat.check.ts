@@ -195,6 +195,36 @@ console.log('\n[generic：没有正文的图集页也不该判失败]');
   eq('只有 1 张图仍判失败', r2, null);
 }
 
+console.log('\n[图片消息：带一个空的 #js_content 也要能兜住]');
+{
+  // 图片消息常见的是「有个 #js_content 但里面只有图 / 几个字」。
+  // 之前兜底被 `#js_content 长度 === 0` 挡住，这条永远走不到。
+  const html = `<html><head>
+      <meta property="og:title" content="空正文容器的图片消息">
+    </head><body>
+      <h1 id="activity-name">空正文容器的图片消息</h1>
+      <a id="js_name">某号</a>
+      <div id="js_content"><p><br></p></div>
+      <div class="swiper">
+        <img data-src="https://mmbiz.qpic.cn/p1/640?wx_fmt=jpeg&amp;from=appmsg">
+        <img data-src="https://mmbiz.qpic.cn/p2/640?wx_fmt=jpeg&amp;from=appmsg">
+        <img data-src="https://mmbiz.qpic.cn/p3/640?wx_fmt=jpeg&amp;from=appmsg">
+      </div>
+    </body></html>`;
+
+  const r = await wechatAdapter.capture({
+    url: new URL('https://mp.weixin.qq.com/s/emptyContent'),
+    html,
+  });
+
+  if (!r) {
+    console.log('  FAIL 空 #js_content 的图片消息应能兜住');
+  } else {
+    eq('走兜底路径', r.meta.kind, 'image-post-fallback');
+    eq('抓到 3 张图', r.images.length, 3);
+  }
+}
+
 console.log('\n[边界：非公众号页面不该被 wechat 认领]');
 eq('example.com 不命中', wechatAdapter.match(new URL('https://example.com/s')), false);
 eq('generic 永远命中', genericAdapter.match(new URL('https://example.com/x')), true);

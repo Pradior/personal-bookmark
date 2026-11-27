@@ -90,6 +90,11 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
     });
 
     if (!baseResult) {
+      // 这条必须打：否则日志里只有"开始处理"，看不出到底哪一步失败
+      console.warn(
+        `[capture] 解析失败 ${itemId}：${tried.join(' → ')} 都没能抽出正文` +
+          `${clientHtml ? `（客户端 HTML ${Math.round(clientHtml.length / 1024)}KB）` : '（服务端抓取）'}`,
+      );
       await setState({
         fetchState: 'failed',
         fetchError: `解析不出正文（adapter: ${tried.join(' → ')}）。可以试试用浏览器打开后粘贴正文保存。`,

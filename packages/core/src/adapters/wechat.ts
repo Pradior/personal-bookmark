@@ -138,51 +138,58 @@ export const wechatAdapter: Adapter = {
     if ($content.length === 0 || $content.text().trim().length < 20) {
       /**
        * 兜底：微信改过图片消息的 DOM（类名/ID 会变），上面的选择器可能不命中。
-       * 没有 #js_content 但又有一堆内容图，就按图片消息处理。
+       *
+       * 注意这里**不能**再要求"没有 #js_content" —— 图片消息很可能带着一个
+       * 空的（或只有几个字的） #js_content，那种情况下页面照样解析不出来。
+       * 只要主页正文分支失败，就按图片处理。
        *
        * 门槛 ≥3 张：头图、头像、二维码通常只有 1–2 张，混不进这个门槛；
        * worker 那边还会按"源图 <120px"再过滤一次，双重保险。
        */
-      if ($('#js_content').length === 0) {
-        const { images } = harvestImages($, $('body'), {
-          referer: WECHAT_REFERER,
-          userAgent: WECHAT_UA,
-          cookie: ctx.cookie,
-        });
+      const { images } = harvestImages($, $('body'), {
+        referer: WECHAT_REFERER,
+        userAgent: WECHAT_UA,
+        cookie: ctx.cookie,
+      });
 
-        if (images.length >= 3) {
-          const fbTitle =
-            $('#activity-name').text().trim() ||
-            $('meta[property="og:title"]').attr('content')?.trim() ||
-            grabVar(html, 'msg_title');
-          const fbDesc = normalizeText(
-            $('meta[property="og:description"]').attr('content') ?? '',
-          );
+      if (images.length >= 3) {
+        const fbTitle =
+          $('#activity-name').text().trim() ||
+          $('meta[property="og:title"]').attr('content')?.trim() ||
+          grabVar(html, 'msg_title');
+        const fbDesc = normalizeText(
+          $('meta[property="og:description"]').attr('content') ?? '',
+        );
 
-          warnings.push(
-            `没找到标准正文容器，按图片消息处理（${images.length} 张图）。微信可能改了页面结构。`,
-          );
+        warnings.push(
+          `没找到标准正文容器，按图片消息处理（${images.length} 张图）。微信可能改了页面结构。`,
+        );
 
-          return {
-            type: 'image',
-            source: 'wechat',
-            title: fbTitle || undefined,
-            author: $('#js_name').text().trim() || grabVar(html, 'nickname') || undefined,
-            siteName: '公众号',
-            excerpt: fbDesc ? fbDesc.slice(0, 120) : undefined,
-            contentHtml: $('body').html() ?? '',
-            contentText: normalizeText(`${fbTitle ?? ''}\n${fbDesc}`),
-            coverUrl: images[0]?.url,
-            coverReferer: WECHAT_REFERER,
-            images,
-            rawSnapshot: html,
-            meta: { finalUrl, kind: 'image-post-fallback', imageCount: images.length },
-            warnings,
-          };
-        }
+        return {
+          type: 'image',
+          source: 'wechat',
+          title: fbTitle || undefined,
+          author: $('#js_name').text().trim() || grabVar(html, 'nickname') || undefined,
+          siteName: '公众号',
+          excerpt: fbDesc ? fbDesc.slice(0, 120) : undefined,
+          contentHtml: $('body').html() ?? '',
+          contentText: normalizeText(`${fbTitle ?? ''}\n${fbDesc}`),
+          coverUrl: images[0]?.url,
+          coverReferer: WECHAT_REFERER,
+          images,
+          rawSnapshot: html,
+          meta: { finalUrl, kind: 'image-post-fallback', imageCount: images.length },
+          warnings,
+        };
       }
 
       // 认领了但解析不出来 —— 交给 generic 兜底
+      // 这条日志很关键：失败时看不出原因会反复猜。把三个判据一次打全。
+      console.warn(
+        `[wechat] 解析不出正文：js_content=${$('#js_content').length} 个，` +
+          `正文文字=${normalizeText($('#js_content').text()).length} 字，` +
+          `整页可收图片=${images.length} 张，html=${html.length}B`,
+      );
       return null;
     }
 
