@@ -183,6 +183,23 @@ export const wechatAdapter: Adapter = {
         };
       }
 
+      /*
+       * 前端渲染的空壳页：微信把部分文章（尤其是分享短链 /s/xxx）改成
+       * 客户端渲染，服务端拿到的 HTML 只有 30KB 左右、0 个 <img>、
+       * 没有 #js_content，但带 vite-legacy / js_fullscreen_layout_padding 这类标记。
+       *
+       * 2026-11-27 实测：同一个 URL，服务端 31KB 空壳，
+       * 浏览器里正常显示 6 张图。这种只能靠扩展送渲染后的 DOM。
+       */
+      const isJsShell = /vite-legacy|js_fullscreen_layout_padding/.test(html);
+      if (isJsShell) {
+        throw new FetchError(
+          '这篇的正文由浏览器端 JS 渲染，服务端只能拿到空壳（没有正文也没有图片）。' +
+            '请在浏览器里打开这一页，用扩展「保存当前页面」即可完整归档。',
+          'blocked',
+        );
+      }
+
       // 认领了但解析不出来 —— 交给 generic 兜底
       // 这条日志很关键：失败时看不出原因会反复猜。把三个判据一次打全。
       console.warn(

@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { wechatAdapter, genericAdapter, pickAdapter } from '../src/adapters/index.ts';
 import { sanitizeContent, htmlToText } from '../src/sanitize.ts';
+import { FetchError } from '../src/fetcher.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = readFileSync(join(here, 'fixtures/wechat-article.html'), 'utf8');
@@ -21,6 +22,8 @@ const imagePostUnknown = readFileSync(
   join(here, 'fixtures/wechat-image-post-unknown.html'),
   'utf8',
 );
+// 前端 JS 渲染的空壳页（服务端只能拿到 30KB 左右的骨架）
+const jsShell = readFileSync(join(here, 'fixtures/wechat-js-shell.html'), 'utf8');
 
 let pass = 0;
 let fail = 0;
@@ -223,6 +226,27 @@ console.log('\n[图片消息：带一个空的 #js_content 也要能兜住]');
     eq('走兜底路径', r.meta.kind, 'image-post-fallback');
     eq('抓到 3 张图', r.images.length, 3);
   }
+}
+
+console.log('\n[前端渲染的空壳页：要报明确的错，而不是"解析不出正文"]');
+{
+  // 真机 2026-11-27：服务端拿到 31KB 空壳（0 个 <img>、无 #js_content），
+  // 浏览器里却正常显示 6 张图。这种必须让用户改用扩展，而不是反复重试。
+  let caught: unknown = null;
+  try {
+    await wechatAdapter.capture({
+      url: new URL('https://mp.weixin.qq.com/s/hQPHsxp75jp5v6MDMRTPIQ'),
+      html: jsShell,
+    });
+  } catch (err) {
+    caught = err;
+  }
+
+  truthy('抛出了 FetchError', caught instanceof FetchError);
+  const e = caught as FetchError;
+  eq('kind 是 blocked（不再尝试 generic）', e.kind, 'blocked');
+  truthy('提示里让用户用扩展', /扩展/.test(e.message));
+  truthy('说明了是浏览器端渲染', /浏览器端|前端/.test(e.message));
 }
 
 console.log('\n[边界：非公众号页面不该被 wechat 认领]');
