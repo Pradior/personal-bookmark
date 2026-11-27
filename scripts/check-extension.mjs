@@ -78,7 +78,11 @@ const referenced = [
   manifest.background?.service_worker,
 ].filter(Boolean);
 
-for (const rel of referenced) {
+// 图标也要在（扩展工具栏没图标会显示成一个灰色方块）
+for (const rel of Object.values(manifest.icons ?? {})) referenced.push(rel);
+for (const rel of Object.values(manifest.action?.default_icon ?? {})) referenced.push(rel);
+
+for (const rel of new Set(referenced)) {
   if (existsSync(join(dir, rel))) ok(`引用文件存在: ${rel}`);
   else fail(`manifest 引用了不存在的文件: ${rel}`);
 }

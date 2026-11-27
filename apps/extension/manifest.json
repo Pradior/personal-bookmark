@@ -9,9 +9,18 @@
 
   "optional_host_permissions": ["http://*/*", "https://*/*"],
 
+  "icons": {
+    "32": "icon-32.png",
+    "192": "icon-192.png"
+  },
+
   "action": {
     "default_popup": "popup.html",
-    "default_title": "保存到 个人bookmark"
+    "default_title": "保存到 个人bookmark",
+    "default_icon": {
+      "32": "icon-32.png",
+      "192": "icon-192.png"
+    }
   },
 
   "background": {

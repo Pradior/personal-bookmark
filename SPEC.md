@@ -1770,6 +1770,29 @@ flex 子元素默认 `min-height: auto`，不写 0 就收缩不到内容以下 �
 否则会误抓没滚动的包装层）。找不到祖先时滚窗口 —— 独立阅读页就是这种情况。
 到顶/到底时把剩余滚动放给页面，避免"卡住不动"。
 
+#### 图标与 PWA 清单（v1.1）
+
+| 文件 | 位置 | 用途 |
+|---|---|---|
+| `favicon.ico` / `favicon-16x16.png` / `favicon-32x32.png` | `apps/web/public/` | 浏览器标签页 |
+| `apple-touch-icon.png`（180） | 同上 | iOS 添加到主屏幕 |
+| `android-chrome-192x192.png` / `-512x512.png` | 同上 | PWA / Android |
+| `manifest.webmanifest` | `app/manifest.ts` **动态生成** | PWA 清单 |
+| `icon-32.png` / `icon-192.png` | `apps/extension/` | 扩展工具栏图标 |
+
+**清单为什么要动态生成**：应用名来自 `APP_NAME` 环境变量。
+静态 `site.webmanifest` 里的 `name` 是写死的，改 `APP_NAME` 之后
+装到手机桌面上会显示成空名字或旧名字。
+
+`theme_color` / `background_color` 与 `globals.css` 的 `--accent` / `--bg` 对齐；
+启动画面不会闪一个别的颜色。
+
+中间件必须放行这些静态资源：**未登录时浏览器也会去请求 favicon**，
+拦掉的话控制台一片红，PWA 也装不上。
+
+移动端地址栏配色用 `export const viewport: Viewport`（Next 15 要求
+`themeColor` 不能放在 `metadata` 里），并给浅色/深色各一档。
+
 ### 9.7 关键页面清单
 
 | 路由 | 页面 | 参考 | 交付 Sprint |
