@@ -24,6 +24,8 @@ const imagePostUnknown = readFileSync(
 );
 // 前端 JS 渲染的空壳页（服务端只能拿到 30KB 左右的骨架）
 const jsShell = readFileSync(join(here, 'fixtures/wechat-js-shell.html'), 'utf8');
+// 图片在页面内联 JSON 里，DOM 里一张 <img> 都没有（无头浏览器渲染后的真机形态）
+const imagesInJson = readFileSync(join(here, 'fixtures/wechat-images-in-json.html'), 'utf8');
 
 let pass = 0;
 let fail = 0;
@@ -247,6 +249,27 @@ console.log('\n[前端渲染的空壳页：要报明确的错，而不是"解析
   eq('kind 是 blocked（不再尝试 generic）', e.kind, 'blocked');
   truthy('提示里让用户用扩展', /扩展/.test(e.message));
   truthy('说明了是浏览器端渲染', /浏览器端|前端/.test(e.message));
+}
+
+console.log('\n[图片在内联 JSON 里：DOM 没 <img> 也要能收到图]');
+{
+  // 真机 2026-11-27：浏览器渲染出 4.3MB、#js_content 有文字 157 字，
+  // 但 harvestImages 一张都没找到 —— 图全在内联的 picture_page_info_list 里。
+  const r = await wechatAdapter.capture({
+    url: new URL('https://mp.weixin.qq.com/s/hQPHsxp75jp5MTQ'),
+    html: imagesInJson,
+  });
+
+  if (!r) {
+    console.log('  FAIL 有文字有图，不该返回 null');
+  } else {
+    eq('从 JSON 里捞到 3 张图（AAAA 的变体按路径去重）', r.images.length, 3);
+    truthy('路径去重生效', r.images.filter((i) => i.url.includes('AAAA')).length === 1);
+    truthy('表情 gif 被排除', !r.images.some((i) => i.url.includes('mmbiz_gif')));
+    truthy('正文补上了图片占位符', r.contentHtml.includes('data-pb-img="sweep-1"'));
+    truthy('有提示说明图片来自页面数据', r.warnings.some((w) => w.includes('页面数据')));
+    truthy('正文文字仍然来自 DOM', r.contentText.includes('Obsidian'));
+  }
 }
 
 console.log('\n[边界：非公众号页面不该被 wechat 认领]');

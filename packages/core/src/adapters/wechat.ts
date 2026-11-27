@@ -38,6 +38,51 @@ function escapeHtml(input: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * 从原始 HTML 里扫微信公众号的图片地址。
+ *
+ * 为什么要这一步：图片消息（以及部分前端渲染的文章）虽然 DOM 里有
+ * `#js_content`，但图片不在 `<img>` 标签里 —— 它们以 URL 的形式躺在
+ * 页面的内联 JSON / 脚本里。2026-11-27 真机：浏览器渲染出 4.3MB HTML、
+ * `#js_content` 有内容、可见文字 157 字，但 `harvestImages` 一张都没找到。
+ *
+ * 所以退一步：直接在整个 HTML 里找 mmbiz.qpic.cn 的地址。
+ * 可靠的部分（正文文字、标题）仍然走 DOM；只有图片走这条路。
+ */
+function sweepWechatImages(html: string, limit = 20): string[] {
+  const re = /https?:\/\/mmbiz\.qpic\.cn\/[^\s"'\\<>()]+/gi;
+  const byPath = new Map<string, string>();
+
+  for (const match of html.matchAll(re)) {
+    let url = match[0];
+    // 内联 JSON 里的转义：\u0026 / \/ / &amp;
+    url = url
+      .replace(/\\u0026/g, '&')
+      .replace(/\\\//g, '/')
+      .replace(/&amp;/g, '&')
+      .replace(/[),.;"'\\]+$/, '');
+
+    if (!/^https?:\/\//i.test(url)) continue;
+    // 只认可归档的位图；gif 多是表情/动图，二维码也常是 png 但尺寸会很小，
+    // 后者交给 worker 的「源图 <120px 跳过」兜
+    if (!/\/(mmbiz_jpg|mmbiz_png|mmbiz)\//i.test(url)) continue;
+    if (/wx_fmt=gif/i.test(url)) continue;
+
+    // 同一张图有多个尺寸变体：/mmbiz_jpg/<hash>/640 与 /mmbiz_jpg/<hash>/0
+    // 是同一张图，只差最后那个尺寸段 —— 去重键要去掉它
+    let key: string;
+    try {
+      key = new URL(url).pathname.replace(/\/\d+$/, '');
+    } catch {
+      key = url;
+    }
+    if (!byPath.has(key)) byPath.set(key, url);
+    if (byPath.size >= limit) break;
+  }
+
+  return [...byPath.values()];
+}
+
 export const wechatAdapter: Adapter = {
   id: 'wechat',
   priority: 100,
@@ -246,9 +291,31 @@ export const wechatAdapter: Adapter = {
     });
 
     // 6) 正文 HTML / 纯文本
-    const contentHtml = ($content.html() ?? '').trim();
+    let contentHtml = ($content.html() ?? '').trim();
     const contentText = normalizeText($content.text());
     if (contentText.length < 20) return null;
+
+    /**
+     * 图片兜底：DOM 里没有 <img> 时，从整页数据里捞 mmbiz 地址。
+     * 图片消息的图都在内联 JSON 里（真机：4.3MB HTML、0 个 <img>）。
+     */
+    if (images.length === 0) {
+      const swept = sweepWechatImages(html);
+      if (swept.length > 0) {
+        swept.forEach((url, i) => {
+          const key = `sweep-${i + 1}`;
+          images.push({
+            key,
+            url,
+            referer: WECHAT_REFERER,
+            userAgent: WECHAT_UA,
+            cookie: ctx.cookie,
+          });
+          contentHtml += `\n<p><img data-pb-img="${key}" /></p>`;
+        });
+        warnings.push(`正文里没有 <img>，从页面数据中找到 ${swept.length} 张图`);
+      }
+    }
 
     const excerpt =
       grabVar(html, 'msg_desc') || normalizeText(contentText).slice(0, 120);

@@ -139,6 +139,13 @@ export const genericAdapter: Adapter = {
       }
 
       // 连正文都抽不出来：留一条"仅链接"，别整体失败（SPEC §6.2 底线）
+      // 打一行诊断：知乎这类站点失败时，光看"解析不出正文"没法判断是
+      // 登录墙、验证页，还是选择器没覆盖
+      console.warn(
+        `[generic] 抽不出正文：内容容器=${$root ? '有' : '无'}，` +
+          `可见文字=${normalizeText($root?.text() ?? '').length} 字，` +
+          `图片=${images.length} 张，html=${html.length}B`,
+      );
       return null;
     }
 
