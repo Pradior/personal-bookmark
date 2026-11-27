@@ -58,10 +58,16 @@ export default function DetailPane() {
   const [error, setError] = useState<string | null>(null);
   const [prefs, setPrefs] = useState({ font: 18, line: 1.85 });
   const abortRef = useRef<AbortController | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setPrefs(loadPrefs());
   }, []);
+
+  // 换条目时回到顶部：否则读到一半再点下一条，会落在上一篇的滚动位置
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [selectedId]);
 
   const load = useCallback(async (id: string) => {
     abortRef.current?.abort();
@@ -160,7 +166,7 @@ export default function DetailPane() {
         ) : null}
       </div>
 
-      <div className="pane-reader-body">
+      <div className="pane-reader-body" ref={bodyRef}>
         {error ? (
           <p className="form-error" role="alert">
             {error}

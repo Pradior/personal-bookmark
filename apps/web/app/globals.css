@@ -712,6 +712,11 @@ button {
   display: none;
   flex-direction: column;
   min-width: 0;
+  /* 这两个是"右栏滚不动"的根因：
+     flex 子元素默认 min-height:auto，不写 0 就收缩不到内容以下，
+     于是整栏被正文撑高、overflow-y 永远不触发。 */
+  min-height: 0;
+  overflow: hidden;
   background: transparent;
 }
 
@@ -1917,6 +1922,8 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* 滚到底时别把滚动"链"给外层，避免整页跟着动 */
+  overscroll-behavior: contain;
   padding: var(--space-4);
 }
 

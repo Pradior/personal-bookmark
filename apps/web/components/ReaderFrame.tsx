@@ -9,6 +9,22 @@ type Lightbox = {
   height?: number;
 };
 
+/**
+ * 从 iframe 往上找最近的「真正可滚动」的祖先。
+ * 只认 overflow-y: auto/scroll **且** 内容确实超出可视区的元素，
+ * 否则会误抓到那些设了 overflow 但并没滚动的包装层。
+ */
+function findScrollableAncestor(from: HTMLElement | null): HTMLElement | null {
+  let node = from?.parentElement ?? null;
+  while (node) {
+    const style = window.getComputedStyle(node);
+    const scrollable = style.overflowY === 'auto' || style.overflowY === 'scroll';
+    if (scrollable && node.scrollHeight > node.clientHeight + 1) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
 type Props = {
   html: string;
   /** 正文基准字号（px） */
@@ -64,6 +80,47 @@ export default function ReaderFrame({ html, fontSize = 18, lineHeight = 1.85 }: 
       const ro = new ResizeObserver(resize);
       if (doc.body) ro.observe(doc.body);
     }
+
+    /**
+     * 滚轮转发（这是"有滚动条但滚轮不管用"的解法）
+     *
+     * iframe 是独立的浏览上下文：鼠标停在正文上时，滚轮事件进的是
+     * iframe 自己的文档。而我们把 iframe 撑成了内容全高、它内部没有可滚动
+     * 区域，于是事件滚不动任何东西，也不会冒泡到外层容器。
+     *
+     * 所以这里接管 iframe 内的 wheel，手动滚最近的可滚动祖先
+     * （右栏 = .pane-reader-body；独立阅读页没有可滚祖先 → 滚窗口）。
+     */
+    const onWheel = (event: WheelEvent) => {
+      const frame = frameRef.current;
+      if (!frame) return;
+
+      const scroller = findScrollableAncestor(frame);
+      if (!scroller) {
+        window.scrollBy(0, event.deltaY);
+        event.preventDefault();
+        return;
+      }
+
+      const atTop = scroller.scrollTop <= 0;
+      const atBottom =
+        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+
+      // 到顶/到底就不再拦，把剩下的滚动交给页面（或干脆不动）
+      if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+        if (window.scrollY > 0 || window.innerHeight < document.body.scrollHeight) {
+          window.scrollBy(0, event.deltaY);
+        }
+        event.preventDefault();
+        return;
+      }
+
+      scroller.scrollTop += event.deltaY;
+      event.preventDefault();
+    };
+
+    // 必须 passive:false，否则 preventDefault 无效
+    doc.addEventListener('wheel', onWheel, { passive: false });
 
     doc.querySelectorAll('img').forEach((img) => {
       img.addEventListener('load', resize);
