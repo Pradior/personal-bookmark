@@ -1795,6 +1795,26 @@ worker ──(普通抓取失败)──▶ pb-browser /render ──▶ 渲染�
 自检 `scripts/check-browser.mts`（14 项）用 stub fetch 覆盖：
 未配置时不发请求、成功/失败/HTML 过短、熔断后不再发请求、网络异常不抛错。
 
+**哪些站点走浏览器**（v1.3）：
+
+| 模式 | 站点 | 原因 |
+|---|---|---|
+| **直接走浏览器** | 小红书、抖音、知乎、Instagram、Facebook、Threads、X | 服务端 HTML 是空壳或有反爬，先 fetch 是白费一次请求 |
+| **失败后再走浏览器** | 其它所有站点 | 公众号图文、普通网页直接 fetch 就够，渲染一次要 2–5 秒 |
+| 不走浏览器 | 客户端送 HTML（扩展 / 粘贴正文） | 那已经是最好的输入 |
+
+> 需要**登录**的站点（Instagram / Facebook / X）即使渲染也只能拿到登录墙，
+> 必须在设置页配站点凭据（Cookie），浏览器会把 Cookie 注入上下文。
+
+通用 adapter 的正文选择器同步做了扩充（知乎 `.Post-RichText`、
+cnbeta `.article-content`、GitHub `article.markdown-body` 等）。
+另外把"命中明确选择器"的字数门槛从 200 降到 80 —— 那些选择器本身就是
+强信号，要求 200 字会把短文章（知乎回答、README 摘要）整条漏掉；
+只有靠"段落最多"启发式时才保留 200 的门槛。
+
+自检 `packages/core/test/sites.check.ts`（13 项）覆盖知乎 / cnbeta / GitHub
+三种真实结构的抽取，以及"登录墙不该被当成正文"的负例。
+
 #### 双栏预览（v1.0）
 
 宽屏（≥1280px，右栏存在）时：**单击卡片 → 右栏预览，双击 → 独立阅读页**。

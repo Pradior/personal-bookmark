@@ -18,7 +18,7 @@ import {
 } from '@pb/core';
 import { ingestImage } from '../assets';
 import { findCredential, type SiteCredential } from '../credentials';
-import { browserEnabled, renderWithBrowser } from '../browser';
+import { browserEnabled, preferBrowser, renderWithBrowser } from '../browser';
 
 export type CaptureJobData = {
   itemId: string;
@@ -82,27 +82,49 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       console.log(`[capture] 使用站点凭据: ${credential.domain}`);
     }
 
+    /**
+     * 已知必须跑 JS 的站点（小红书 / 抖音 / 知乎 / 海外社交）：
+     * 直接走浏览器，跳过那次注定失败的请求。
+     *
+     * 客户端送来 HTML（扩展 / 粘贴正文）时不用浏览器 —— 那已经是最好的输入。
+     */
+    let renderedHtml = clientHtml;
+    let viaBrowser = false;
+
+    if (!renderedHtml && preferBrowser(url)) {
+      console.log(`[capture] 该站点需要 JS 渲染，直接走无头浏览器 ${url.slice(0, 80)}`);
+      const rendered = await renderWithBrowser(url, {
+        cookie: credential?.cookie,
+        userAgent: credential?.userAgent,
+      });
+      if (rendered) {
+        renderedHtml = rendered.html;
+        viaBrowser = true;
+      } else {
+        // 浏览器不可用时退回普通抓取，至少还能存下标题和摘要
+        console.warn('[capture] 浏览器渲染不可用，退回普通抓取');
+      }
+    }
+
     const { result: baseResult, tried } = await captureWithFallback({
       url: new URL(url),
-      html: clientHtml,
+      html: renderedHtml,
       cookie: credential?.cookie,
       userAgent: credential?.userAgent,
       referer: credential?.referer,
     });
 
     /**
-     * 普通抓取失败时，试试无头浏览器。
+     * 还没用浏览器、且普通抓取失败时，再试一次浏览器。
      *
-     * 为什么放在失败之后而不是之前：渲染一次 2–5 秒，而大多数站点
-     * （公众号图文、普通网页）直接 fetch 就够了。只有"抓不到内容"时
-     * 才值得付出这个代价。
+     * 为什么不在之前：渲染一次 2–5 秒，而大多数站点（公众号图文、
+     * 普通网页）直接 fetch 就够了。只有"抓不到内容"时才值得付这个代价。
      *
      * 没配 BROWSER_URL（没起浏览器容器）时这里直接跳过，行为与以前一致。
      */
     let result = baseResult;
-    let viaBrowser = false;
 
-    if (!result && browserEnabled()) {
+    if (!result && !viaBrowser && browserEnabled()) {
       console.log(`[capture] 普通抓取失败，改用无头浏览器渲染 ${url.slice(0, 80)}`);
       const rendered = await renderWithBrowser(url, {
         cookie: credential?.cookie,

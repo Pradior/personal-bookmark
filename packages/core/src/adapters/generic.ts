@@ -11,16 +11,43 @@ import type { Adapter, CaptureContext, CaptureResult } from './types';
 import { countWords } from './types';
 import { harvestImages, metaContent, normalizeText } from './shared';
 
+/**
+ * 正文容器候选，按「命中率 × 精度」排序。
+ *
+ * 这些选择器来自实际站点，不是猜的：
+ *   知乎       .Post-RichText / .RichText / .AnswerItem
+ *   cnbeta     .article-content / #news_content
+ *   GitHub     article.markdown-body
+ *   掘金/简书  .markdown-body / .article
+ *   通用        article / main / [role=main]
+ */
 const CONTENT_SELECTORS = [
   'article',
   'main',
   '[role="main"]',
+  '.Post-RichText',
+  '.RichText',
+  '.AnswerItem',
+  '.markdown-body',
   '.article-content',
+  '#news_content',
+  '.article-body',
   '.post-content',
   '.entry-content',
+  '.article',
+  '#artibody',
   '#js_content',
   '.content',
   '#content',
+];
+
+/** 作者候选：meta 拿不到时兜底 */
+const AUTHOR_SELECTORS = [
+  '.author',
+  '.byline',
+  '[rel="author"]',
+  '.PostAuthor-info',
+  '.article-author',
 ];
 
 export const genericAdapter: Adapter = {
@@ -61,7 +88,8 @@ export const genericAdapter: Adapter = {
 
     const author =
       metaContent($, 'meta[name="author"]') ??
-      metaContent($, 'meta[property="article:author"]');
+      metaContent($, 'meta[property="article:author"]') ??
+      firstText($, AUTHOR_SELECTORS);
 
     const siteName =
       metaContent($, 'meta[property="og:site_name"]') ?? ctx.url.hostname;
@@ -175,11 +203,14 @@ export const genericAdapter: Adapter = {
 
 /** 找不到语义容器时，挑段落总字数最多的那个 div */
 function pickContentRoot($: cheerio.CheerioAPI): cheerio.Cheerio<any> | null {
+  // 命中了明确的内容选择器，门槛就可以低一些 —— 这些选择器本身就是强信号，
+  // 要求 200 字会把"短文章"漏掉（知乎回答、GitHub README 摘要都可能很短）。
   for (const selector of CONTENT_SELECTORS) {
     const $el = $(selector).first();
-    if ($el.length > 0 && $el.text().trim().length > 200) return $el;
+    if ($el.length > 0 && $el.text().trim().length > 80) return $el;
   }
 
+  // 靠启发式（段落最多）时门槛保持高：没有强信号，必须够长才敢认
   let best: cheerio.Cheerio<any> | null = null;
   let bestScore = 0;
 
@@ -195,4 +226,13 @@ function pickContentRoot($: cheerio.CheerioAPI): cheerio.Cheerio<any> | null {
   });
 
   return bestScore > 200 ? best : null;
+}
+
+/** 取第一个非空文本（作者之类的小字段用） */
+function firstText($: cheerio.CheerioAPI, selectors: string[]): string | undefined {
+  for (const selector of selectors) {
+    const text = $(selector).first().text().trim();
+    if (text.length > 0 && text.length < 80) return text;
+  }
+  return undefined;
 }

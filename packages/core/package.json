@@ -17,7 +17,8 @@
     "check:douyin": "tsx ./test/douyin.check.ts",
     "check:credential": "tsx ./test/credential.check.ts",
     "check:hints": "tsx ./test/hints.check.ts",
-    "check:image": "tsx ./test/image.check.ts"
+    "check:image": "tsx ./test/image.check.ts",
+    "check:sites": "tsx ./test/sites.check.ts"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

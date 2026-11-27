@@ -50,6 +50,43 @@ export function browserEnabled(): boolean {
   return Boolean(process.env.BROWSER_URL);
 }
 
+/**
+ * 已知「服务端抓不到、必须跑 JS」的站点。
+ *
+ * 对这些站点直接走浏览器，而不是"先失败再重试" —— 省掉一次必然失败的
+ * 请求，也避免 adapter 先写一堆解析失败的日志。
+ *
+ * 判断标准：实测或已知的服务端渲染缺失 / 反爬（返回空壳或 403）。
+ * 注意：需要**登录**才能看的站点（Instagram / Facebook / X）即使渲染
+ * 也只能拿到登录墙，必须配站点凭据（Cookie）。
+ */
+const BROWSER_FIRST_HOSTS = [
+  // 小红书：整站 SPA，服务端 HTML 只有壳
+  'xiaohongshu.com',
+  'xhslink.com',
+  // 抖音：同理
+  'douyin.com',
+  'iesdouyin.com',
+  // 知乎：反爬强，服务端常返回验证页
+  'zhihu.com',
+  // 海外社交：内容靠 JS，且大多需要登录 Cookie
+  'instagram.com',
+  'facebook.com',
+  'threads.net',
+  'x.com',
+  'twitter.com',
+];
+
+export function preferBrowser(url: string): boolean {
+  if (!browserEnabled()) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return BROWSER_FIRST_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 /** 仅供自检使用：重置熔断状态 */
 export function resetBrowserBreaker(): void {
   breaker.failures = 0;

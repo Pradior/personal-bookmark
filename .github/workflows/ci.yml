@@ -80,6 +80,9 @@ jobs:
       - name: 自检：密码与会话代次
         run: pnpm check:auth
 
+      - name: 自检：通用站点的正文抽取
+        run: pnpm --filter @pb/core check:sites
+
       - name: 自检：无头浏览器调用与熔断
         run: pnpm check:browser
 
