@@ -7,7 +7,15 @@
  *
  * 服务不可用时静默返回 null —— 抓取退回原来的行为，不让整个队列卡住。
  */
-export type RenderResult = { html: string; finalUrl: string; title: string };
+export type RenderResult = {
+  html: string;
+  finalUrl: string;
+  title: string;
+  /** 诊断：渲染后页面可见文字长度 */
+  textLength?: number;
+  /** 诊断：渲染后是否出现 #js_content 正文容器 */
+  hasJsContent?: boolean;
+};
 
 export type RenderOptions = {
   cookie?: string;

@@ -40,15 +40,33 @@ let browser: Browser | null = null;
 let active = 0;
 const queue: Array<() => void> = [];
 
+/**
+ * 默认 UA。
+ *
+ * 必须覆盖：Playwright 默认 UA 里带 `HeadlessChrome/xxx`，很多站点
+ * （微信就是）一眼识别出来，直接给空壳。（2026-11-27 真机验证）
+ * 版本号在 launch 之后用 browser.version() 覆盖成真实版本 ——
+ * UA 写死 Chrome/131 而实际浏览器是 120，同样会被识别。
+ */
+function buildUa(version: string): string {
+  const major = version.split('.')[0] ?? '120';
+  return (
+    `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ` +
+    `(KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`
+  );
+}
+
 async function getBrowser(): Promise<Browser> {
   if (browser?.isConnected()) return browser;
   browser = await chromium.launch({
     executablePath: EXECUTABLE,
+    // 去掉 --enable-automation：它会让 navigator.webdriver 为 true，
+    // 而且会在部分浏览器里显示"正在受自动测试软件控制"的提示条
+    ignoreDefaultArgs: ['--enable-automation'],
     args: [
       '--no-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      // 减少最明显的自动化特征；不是万能的，但很多静态检测只看这几项
       '--disable-blink-features=AutomationControlled',
     ],
   });
@@ -71,12 +89,34 @@ function release(): void {
   if (next) next();
 }
 
-async function render(req: RenderRequest): Promise<{ html: string; finalUrl: string; title: string }> {
+async function render(req: RenderRequest): Promise<{
+  html: string;
+  finalUrl: string;
+  title: string;
+  /** 诊断用：渲染后页面里的可见文字长度、是否出现某个正文容器 */
+  textLength: number;
+  hasJsContent: boolean;
+}> {
   const b = await getBrowser();
   const context = await b.newContext({
-    userAgent: req.userAgent,
+    userAgent: req.userAgent || buildUa(b.version()),
     viewport: { width: 1280, height: 900 },
     locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai',
+    extraHTTPHeaders: {
+      'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    },
+  });
+
+  // 抹掉最明显的自动化痕迹
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh'] });
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [1, 2, 3, 4, 5],
+    });
+    // 有些检测只看 window.chrome 是否存在
+    (window as unknown as { chrome?: unknown }).chrome = { runtime: {} };
   });
 
   try {
@@ -136,12 +176,20 @@ async function render(req: RenderRequest): Promise<{ html: string; finalUrl: str
     const finalUrl = page.url();
     const title = await page.title().catch(() => '');
 
+    // 诊断信息：能直接看出渲染后到底有没有正文，省得再猜
+    const diag = await page
+      .evaluate(() => ({
+        textLength: (document.body?.innerText ?? '').length,
+        hasJsContent: Boolean(document.querySelector('#js_content')),
+      }))
+      .catch(() => ({ textLength: 0, hasJsContent: false }));
+
     if (!response) {
       // 拿不到 response 一般是导航被中断，但 DOM 已经可用
       console.warn(`[browser] 无响应对象，但仍取到 DOM：${req.url}`);
     }
 
-    return { html, finalUrl, title };
+    return { html, finalUrl, title, ...diag };
   } finally {
     await context.close().catch(() => {});
   }
@@ -199,7 +247,9 @@ const server = createServer(async (req, res) => {
     const result = await render(body);
     console.log(
       `[browser] 渲染完成 ${Math.round((Date.now() - started) / 100) / 10}s ` +
-        `${result.html.length}B ${body.url.slice(0, 80)}`,
+        `${result.html.length}B 文字${result.textLength} ` +
+        `js_content=${result.hasJsContent ? '有' : '无'} ` +
+        `title=${JSON.stringify(result.title.slice(0, 30))} ${body.url.slice(0, 70)}`,
     );
     json(res, 200, result);
   } catch (err) {

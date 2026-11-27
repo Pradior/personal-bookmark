@@ -154,6 +154,15 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       });
 
       if (rendered) {
+        // 先把浏览器看到的东西打出来：如果它自己也只拿到空壳，
+        // 后面的解析失败就是必然的，看这行立刻能分清
+        console.log(
+          `[capture] 浏览器渲染结果：${rendered.html.length}B，` +
+            `可见文字 ${rendered.textLength ?? '?'} 字，` +
+            `js_content=${rendered.hasJsContent ? '有' : '无'}，` +
+            `title=${JSON.stringify((rendered.title ?? '').slice(0, 30))}`,
+        );
+
         const second = await runAdapters(rendered.html);
         if (second.result) {
           result = second.result;
