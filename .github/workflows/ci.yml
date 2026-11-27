@@ -80,6 +80,9 @@ jobs:
       - name: 自检：密码与会话代次
         run: pnpm check:auth
 
+      - name: 自检：无头浏览器调用与熔断
+        run: pnpm check:browser
+
       - name: 校验 docker-compose 与 Dockerfile
         run: pnpm check:compose
 
@@ -114,6 +117,8 @@ jobs:
             image: personal-bookmark-web
           - target: worker
             image: personal-bookmark-worker
+          - target: browser
+            image: personal-bookmark-browser
 
     steps:
       - name: 检出代码

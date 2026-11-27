@@ -146,6 +146,11 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      # 无头浏览器：留空 = 不启用（行为与以前完全一致）
+      # 启用：docker compose --profile browser up -d，并在 .env 里设
+      #   BROWSER_URL=http://pb-browser:3001
+      BROWSER_URL: ${BROWSER_URL:-}
+      BROWSER_TIMEOUT_MS: ${BROWSER_TIMEOUT_MS:-30000}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - ./data/assets:/data/assets
@@ -184,3 +189,35 @@ services:
 #         tar czf backup/assets-$(date +%F).tar.gz -C data assets
 #     data/db 不能热备，必须先 pg_dump。
 # ============================================================================
+
+  # ── 无头浏览器（可选）─────────────────────────────────
+  # 只有把 BROWSER_URL 指向它，worker 才会用。不启用时完全不占资源。
+  # 启用：docker compose --profile browser up -d
+  pb-browser:
+    image: ${IMAGE_REPO:-ghcr.io/pradior}/personal-bookmark-browser:${TAG:-latest}
+    pull_policy: ${PULL_POLICY:-always}
+    container_name: pb-browser
+    init: true
+    profiles: ['browser']
+    environment:
+      PORT: 3001
+      CHROMIUM_PATH: /usr/bin/chromium
+      RENDER_TIMEOUT_MS: ${RENDER_TIMEOUT_MS:-25000}
+      RENDER_CONCURRENCY: ${RENDER_CONCURRENCY:-1}
+      TZ: ${TZ:-Asia/Shanghai}
+    # Chromium 吃 /dev/shm，默认 64MB 会让页面渲染直接崩
+    shm_size: 512mb
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *default-logging
+    restart: unless-stopped

@@ -1,0 +1,19 @@
+{
+  "name": "@pb/browser",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx ./src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "node node_modules/tsx/dist/cli.mjs ./test/render.check.ts"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -188,6 +188,51 @@ chmod +x pull-retry.sh
 sudo docker compose up -d --pull never
 ```
 
+### 1.6 可选：启用无头浏览器（抓 JS 渲染的页面）
+
+有些站点的正文是**前端渲染**的，服务端拿到的 HTML 只是空壳：
+微信部分文章（31KB、0 个 `<img>`、带 `vite-legacy` 标记）、小红书整站。
+
+内置一个 Chromium 容器就能解决——worker 在普通抓取失败时会请求它渲染，
+拿到执行过 JS 的 DOM 后再走原来的解析流程。
+
+```bash
+cd /volume1/docker/personal-bookmark
+
+# 1) 启动浏览器容器（它用 profile 隔离，不加 profile 不会被启动）
+sudo docker compose --profile browser up -d
+
+# 2) 让 worker 知道它的地址
+echo 'BROWSER_URL=http://pb-browser:3001' >> .env
+sudo docker compose up -d pb-worker
+```
+
+验证：
+
+```bash
+sudo docker compose --profile browser exec pb-browser \
+  node -e "fetch('http://127.0.0.1:3001/health').then(r=>r.json()).then(console.log)"
+# 期望 { ok: true, browser: 'idle', active: 0 }
+```
+
+之后抓取失败时，worker 日志会多一条：
+
+```
+[capture] 普通抓取失败，改用无头浏览器渲染 https://mp.weixin.qq.com/s/...
+[capture] 浏览器渲染后解析成功：2845173B → 6 张图
+```
+
+| 项 | 说明 |
+|---|---|
+| 镜像体积 | 约 400MB（Debian chromium + 中文字体） |
+| 内存 | 每次渲染 300–500MB；`shm_size: 512mb` 必须保留，否则 Chromium 会崩 |
+| 速度 | 每篇多 2–5 秒（只有普通抓取失败才会用） |
+| 熔断 | 连续失败 3 次后暂停 5 分钟，避免每条抓取都白等 |
+| 不启用 | `BROWSER_URL` 留空即可，行为与以前完全一致 |
+
+> 站点可能识别 `navigator.webdriver`。我们已经加了
+> `--disable-blink-features=AutomationControlled` 和真实 UA，
+> 但不是万能的——真被拦时仍会退回「仅保存链接」，这时用浏览器扩展。
 ## 2. 拿管理员密码
 
 **打开一次登录页**，然后：

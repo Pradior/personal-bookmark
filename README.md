@@ -11,7 +11,7 @@
 | 已完成 | 待验证 / 待补 |
 |---|---|
 | 11+2 张表迁移、登录、三栏界面 | 小红书图片（依赖浏览器扩展，服务端拿不到） |
-| 公众号 / 通用网页 adapter（56 项断言，含图片消息） | 真机端到端（需要 NAS 上有 DB） |
+| 公众号 / 通用网页 adapter（62 项断言，含图片消息与空壳页识别） | 真机端到端（需要 NAS 上有 DB） |
 | 小红书 / 抖音 adapter（50 / 31 项断言） | 高亮、自动分类规则（L2/L3） |
 | 图片两档变体（display/thumb，原图不落盘） | PWA 安装引导 |
 | 阅读页 + 全屏 lightbox + 「预览原图」 | |
@@ -27,10 +27,11 @@
 | **全文搜索**（FTS + trigram，中文按子串） | |
 | **来源筛选**（公众号/小红书/抖音/网页/速记） | |
 | **设置页改密码**（改完所有会话失效） | |
+| **无头浏览器容器**（可选，抓 JS 渲染的页面） | |
 | 玻璃拟态界面层（导航与浮层，正文保持哑光） | |
 
-自检：**268 项断言**（URL 22 / 公众号 56 / 小红书 50 / 抖音 31 / 凭据 22 / 提示合并 17 /
-图片变体 29 / SQL 片段 25 / 密码与会话 16），外加 compose 与浏览器扩展的静态校验。
+自检：**288 项断言**（URL 22 / 公众号 62 / 小红书 50 / 抖音 31 / 凭据 22 / 提示合并 17 /
+图片变体 29 / SQL 片段 25 / 密码与会话 16 / 浏览器调用 14），外加 compose 与扩展的静态校验。
 
 设计与架构决策全部记录在 **[SPEC.md](./SPEC.md)**，动手前请先读它。
 
@@ -127,6 +128,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 apps/web            Next.js 15 — UI 与 /api/v1（Sprint 0 已就绪）
 apps/worker         队列消费者，pg-boss（Sprint 0 骨架，Sprint 1 填处理器）
 apps/extension      Chrome MV3 扩展（Sprint 2）
+apps/browser        无头浏览器服务（可选容器，渲染 JS 页面）
 packages/core       URL 规范化（已实现）、adapter / 清洗 / 分词 / embedding（待做）
 packages/db         Drizzle schema + 迁移 + 手写 SQL（扩展、函数索引）
 packages/contract   zod schema —— 扩展 / iOS / 第三方共用契约

@@ -18,6 +18,7 @@ import {
 } from '@pb/core';
 import { ingestImage } from '../assets';
 import { findCredential, type SiteCredential } from '../credentials';
+import { browserEnabled, renderWithBrowser } from '../browser';
 
 export type CaptureJobData = {
   itemId: string;
@@ -89,15 +90,60 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       referer: credential?.referer,
     });
 
-    if (!baseResult) {
+    /**
+     * 普通抓取失败时，试试无头浏览器。
+     *
+     * 为什么放在失败之后而不是之前：渲染一次 2–5 秒，而大多数站点
+     * （公众号图文、普通网页）直接 fetch 就够了。只有"抓不到内容"时
+     * 才值得付出这个代价。
+     *
+     * 没配 BROWSER_URL（没起浏览器容器）时这里直接跳过，行为与以前一致。
+     */
+    let result = baseResult;
+    let viaBrowser = false;
+
+    if (!result && browserEnabled()) {
+      console.log(`[capture] 普通抓取失败，改用无头浏览器渲染 ${url.slice(0, 80)}`);
+      const rendered = await renderWithBrowser(url, {
+        cookie: credential?.cookie,
+        userAgent: credential?.userAgent,
+      });
+
+      if (rendered) {
+        const retry = await captureWithFallback({
+          url: new URL(rendered.finalUrl || url),
+          html: rendered.html,
+          cookie: credential?.cookie,
+          userAgent: credential?.userAgent,
+          referer: credential?.referer,
+        });
+        if (retry.result) {
+          result = retry.result;
+          viaBrowser = true;
+          console.log(
+            `[capture] 浏览器渲染后解析成功：${rendered.html.length}B → ` +
+              `${retry.result.images.length} 张图`,
+          );
+        } else {
+          console.warn(
+            `[capture] 浏览器渲染了，但 ${retry.tried.join(' → ')} 仍抽不出正文`,
+          );
+        }
+      }
+    }
+
+    if (!result) {
       // 这条必须打：否则日志里只有"开始处理"，看不出到底哪一步失败
       console.warn(
         `[capture] 解析失败 ${itemId}：${tried.join(' → ')} 都没能抽出正文` +
           `${clientHtml ? `（客户端 HTML ${Math.round(clientHtml.length / 1024)}KB）` : '（服务端抓取）'}`,
       );
+      const browserHint = browserEnabled()
+        ? '已尝试无头浏览器渲染仍失败'
+        : '这类页面需要前端渲染，可以启用浏览器容器或改用扩展保存';
       await setState({
         fetchState: 'failed',
-        fetchError: `解析不出正文（adapter: ${tried.join(' → ')}）。可以试试用浏览器打开后粘贴正文保存。`,
+        fetchError: `解析不出正文（adapter: ${tried.join(' → ')}）。${browserHint}。`,
         fetchedAt: new Date(),
       });
       return;
@@ -106,11 +152,14 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
     // 把扩展在页面里按渲染尺寸筛出来的图片并进来。
     // 小红书的配图是懒加载的，服务端 HTML 里没有；扩展抓 DOM 时也可能没滚到底。
     const hint = (meta.hint ?? undefined) as CaptureHints | undefined;
-    const result = applyHints(baseResult, hint, {
+    result = applyHints(result, hint, {
       referer: credential?.referer,
       userAgent: credential?.userAgent,
       cookie: credential?.cookie,
     });
+    if (viaBrowser) {
+      result.warnings.push('正文由无头浏览器渲染后解析');
+    }
     if (hint?.images?.length) {
       console.log(
         `[capture] 客户端提示图片 ${hint.images.length} 张，合并后共 ${result.images.length} 张`,
