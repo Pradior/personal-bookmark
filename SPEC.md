@@ -1777,8 +1777,14 @@ flex 子元素默认 `min-height: auto`，不写 0 就收缩不到内容以下 �
 | `favicon.ico` / `favicon-16x16.png` / `favicon-32x32.png` | `apps/web/public/` | 浏览器标签页 |
 | `apple-touch-icon.png`（180） | 同上 | iOS 添加到主屏幕 |
 | `android-chrome-192x192.png` / `-512x512.png` | 同上 | PWA / Android |
+| `logo.png`（界面品牌位） | 同上 | 侧栏与登录页的标志 |
 | `manifest.webmanifest` | `app/manifest.ts` **动态生成** | PWA 清单 |
 | `icon-32.png` / `icon-192.png` | `apps/extension/` | 扩展工具栏图标 |
+
+界面的品牌位（侧栏 `BrandMark`、登录页）用 `logo.png` 位图，
+**不再把应用名首字渲染成方块** —— 浏览器标签、手机主屏、界面里应该是同一个标志。
+直接用 192px 版本缩放到 26/28px：浏览器缩图质量足够，2x/3x 屏也清晰；
+单独切一张 26px 的反而在高分屏会糊。
 
 **清单为什么要动态生成**：应用名来自 `APP_NAME` 环境变量。
 静态 `site.webmanifest` 里的 `name` 是写死的，改 `APP_NAME` 之后
@@ -1789,6 +1795,10 @@ flex 子元素默认 `min-height: auto`，不写 0 就收缩不到内容以下 �
 
 中间件必须放行这些静态资源：**未登录时浏览器也会去请求 favicon**，
 拦掉的话控制台一片红，PWA 也装不上。
+
+放行规则是两条：显式清单 + `根路径下图片扩展名`（`/logo.png` 这类）。
+**登录页也在用 logo.png**，如果只按清单放行，新加的图会静默变成 302 →
+登录页的 logo 直接裂图（真踩过：`/logo.png` 返回 `text/html` 而不是 `image/png`）。
 
 移动端地址栏配色用 `export const viewport: Viewport`（Next 15 要求
 `themeColor` 不能放在 `metadata` 里），并给浅色/深色各一档。

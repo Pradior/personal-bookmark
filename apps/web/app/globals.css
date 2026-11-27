@@ -423,6 +423,18 @@ button {
   flex: none;
 }
 
+/* 品牌标位图。图标自带浅色底，所以给圆角但不加背景色，
+   否则会和图标自带的底叠成两层。 */
+.brand-mark-img {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex: none;
+  /* 图标底色偏冷灰，在护眼米黄底上略显突兀，压一点点饱和度柔和些 */
+  filter: saturate(0.95);
+}
+
 .brand-name {
   font-size: 14px;
   font-weight: 600;

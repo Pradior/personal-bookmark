@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import BrandMark from '@/components/BrandMark';
 import { authenticate } from '@/lib/session';
 import { bootstrapAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
@@ -25,9 +26,7 @@ export default async function LoginPage({ searchParams }: Props) {
     <div className="login-wrap">
       <div className="login-card">
         <div className="login-head">
-          <span className="brand-mark" aria-hidden>
-            {env.appName.slice(0, 1)}
-          </span>
+          <BrandMark size={28} />
           <span className="login-title">{env.appName}</span>
         </div>
         <p className="login-sub">输入管理员密码。这是一个单用户的自托管实例。</p>

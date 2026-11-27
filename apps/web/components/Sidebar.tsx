@@ -1,5 +1,6 @@
 import type { SidebarData } from '@/lib/queries';
 import Link from 'next/link';
+import BrandMark from './BrandMark';
 import CollectionCreate from './CollectionCreate';
 import NavItem from './NavItem';
 import {
@@ -31,9 +32,7 @@ export default function Sidebar({ appName, data }: Props) {
   return (
     <aside className="sidebar" aria-label="导航">
       <div className="brand">
-        <span className="brand-mark" aria-hidden>
-          {appName.slice(0, 1)}
-        </span>
+        <BrandMark />
         <span className="brand-name" title={appName}>
           {appName}
         </span>

@@ -15,10 +15,14 @@ const PUBLIC_ASSETS = [
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png',
   '/manifest.webmanifest',
+  '/logo.png',
 ];
 
+/** public/ 下的静态图一律放行：登录页的 logo 也在里面，拦掉就是裂图 */
+const STATIC_IMAGE_RE = /^\/[\w.-]+\.(png|ico|svg|webp|jpe?g|gif)$/i;
+
 function isPublicAsset(pathname: string): boolean {
-  return PUBLIC_ASSETS.includes(pathname);
+  return PUBLIC_ASSETS.includes(pathname) || STATIC_IMAGE_RE.test(pathname);
 }
 
 /**
