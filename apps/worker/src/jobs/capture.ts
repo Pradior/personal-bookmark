@@ -106,24 +106,46 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       }
     }
 
-    const { result: baseResult, tried } = await captureWithFallback({
-      url: new URL(url),
-      html: renderedHtml,
-      cookie: credential?.cookie,
-      userAgent: credential?.userAgent,
-      referer: credential?.referer,
-    });
+    /**
+     * 跑一次 adapter 链，把"抛错"和"返回空"统一成同一形状。
+     *
+     * 为什么必须包 try/catch：wechat 对 JS 空壳页会抛 FetchError('blocked')
+     * （提示用户用扩展），而抛错会直接跳出 captureWithFallback。
+     * 之前那个 throw 写在浏览器接入之前，结果**把浏览器这条路短路了** ——
+     * 日志里只有失败，pb-browser 一条请求都收不到。（2026-11-27 真机）
+     */
+    const runAdapters = async (html: string | undefined) => {
+      try {
+        const r = await captureWithFallback({
+          url: new URL(url),
+          html,
+          cookie: credential?.cookie,
+          userAgent: credential?.userAgent,
+          referer: credential?.referer,
+        });
+        return { result: r.result, tried: r.tried, error: null as string | null };
+      } catch (err) {
+        if (err instanceof FetchError) {
+          // blocked / 需要登录 之类：adapter 有明确诊断，原样保留给最终提示
+          return { result: null, tried: [] as string[], error: err.message };
+        }
+        throw err;
+      }
+    };
+
+    const first = await runAdapters(renderedHtml);
+    let result = first.result;
+    let tried = first.tried;
+    let adapterError = first.error;
 
     /**
-     * 还没用浏览器、且普通抓取失败时，再试一次浏览器。
+     * 还没用浏览器、且普通抓取失败（返回空 **或抛错**）时，试一次浏览器。
      *
      * 为什么不在之前：渲染一次 2–5 秒，而大多数站点（公众号图文、
      * 普通网页）直接 fetch 就够了。只有"抓不到内容"时才值得付这个代价。
      *
      * 没配 BROWSER_URL（没起浏览器容器）时这里直接跳过，行为与以前一致。
      */
-    let result = baseResult;
-
     if (!result && !viaBrowser && browserEnabled()) {
       console.log(`[capture] 普通抓取失败，改用无头浏览器渲染 ${url.slice(0, 80)}`);
       const rendered = await renderWithBrowser(url, {
@@ -132,24 +154,21 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
       });
 
       if (rendered) {
-        const retry = await captureWithFallback({
-          url: new URL(rendered.finalUrl || url),
-          html: rendered.html,
-          cookie: credential?.cookie,
-          userAgent: credential?.userAgent,
-          referer: credential?.referer,
-        });
-        if (retry.result) {
-          result = retry.result;
+        const second = await runAdapters(rendered.html);
+        if (second.result) {
+          result = second.result;
+          tried = second.tried;
+          adapterError = null;
           viaBrowser = true;
           console.log(
             `[capture] 浏览器渲染后解析成功：${rendered.html.length}B → ` +
-              `${retry.result.images.length} 张图`,
+              `${second.result.images.length} 张图`,
           );
         } else {
           console.warn(
-            `[capture] 浏览器渲染了，但 ${retry.tried.join(' → ')} 仍抽不出正文`,
+            `[capture] 浏览器渲染了，但${second.error ?? ` ${second.tried.join(' → ')} 仍抽不出正文`}`,
           );
+          adapterError = second.error ?? adapterError;
         }
       }
     }
@@ -157,15 +176,22 @@ export async function runCapture(data: CaptureJobData, env: CaptureEnv): Promise
     if (!result) {
       // 这条必须打：否则日志里只有"开始处理"，看不出到底哪一步失败
       console.warn(
-        `[capture] 解析失败 ${itemId}：${tried.join(' → ')} 都没能抽出正文` +
+        `[capture] 解析失败 ${itemId}：${adapterError ?? tried.join(' → ')}` +
           `${clientHtml ? `（客户端 HTML ${Math.round(clientHtml.length / 1024)}KB）` : '（服务端抓取）'}`,
       );
+
       const browserHint = browserEnabled()
         ? '已尝试无头浏览器渲染仍失败'
         : '这类页面需要前端渲染，可以启用浏览器容器或改用扩展保存';
+      // adapter 自己给了明确诊断（比如"正文是 JS 渲染的"）就直接用它，
+      // 别在外面再套一层"解析不出正文"把它盖掉
+      const message = adapterError
+        ? `${adapterError}${browserEnabled() ? '（已尝试浏览器渲染，仍不成功）' : ''}`
+        : `解析不出正文（adapter: ${tried.join(' → ')}）。${browserHint}。`;
+
       await setState({
         fetchState: 'failed',
-        fetchError: `解析不出正文（adapter: ${tried.join(' → ')}）。${browserHint}。`,
+        fetchError: message,
         fetchedAt: new Date(),
       });
       return;
