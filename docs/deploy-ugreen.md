@@ -216,6 +216,30 @@ sudo docker compose down                  # 停止（保留数据）
 | 卡片一直「正在抓取」 | worker 异常 | `sudo docker compose logs pb-worker` |
 | `pb-web` 反复重启 | 迁移失败 | 看日志里 migrate 的输出，确认 `DATABASE_URL` 与 pb-db 健康 |
 | `pull` 报 `registry-1.docker.io`: EOF | Docker Hub 连不上（pb-db 镜像来自那里） | 只拉应用镜像：`docker compose pull pb-web pb-worker`；或在 UGOS Docker → 设置 → 加速器 配镜像源。compose 里 `pb-db` 已设 `pull_policy: missing`，正常情况下不会再碰它 |
+| `pull` 报 `ghcr.io/v2`: TLS handshake timeout | NAS 连不上 GitHub Container Registry（间歇性封锁，与镜像无关——CI 一直在推） | 用 `sudo sh scripts/nas-pull.sh`：先探连通性，再按 3s→6s→12s 退避重试 5 次。仍失败见下一行 |
+| 重试多次仍拉不下来 | 该时段网络彻底不通 | 三条路，按成本排序：① 给 NAS 配代理（见下方 dockerd 配置）；② 改 `.env` 里的 `IMAGE_REPO` 指向可用镜像源；③ 先用本地已有镜像 `docker compose up -d --pull never` 不阻塞使用 |
+
+**dockerd 走局域网代理**（如果同一网段有一台能翻墙的机器）：
+
+```bash
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo tee /etc/systemd/system/docker.service.d/proxy.conf >/dev/null <<'EOF'
+[Service]
+Environment="HTTP_PROXY=http://192.168.x.x:7897"
+Environment="HTTPS_PROXY=http://192.168.x.x:7897"
+Environment="NO_PROXY=localhost,127.0.0.1,pb-db,pb-web,pb-worker"
+EOF
+sudo systemctl daemon-reload && sudo systemctl restart docker
+```
+
+**改镜像源不需要动 compose**：`IMAGE_REPO` 已经是变量。
+
+```bash
+# .env
+IMAGE_REPO=ghcr.io/pradior        # 默认
+IMAGE_REPO=<镜像源域名>/pradior    # 换成能连上的反代
+```
+
 
 ### 关于公众号抓取被拦
 
