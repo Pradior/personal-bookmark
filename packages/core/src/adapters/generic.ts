@@ -55,12 +55,6 @@ export const genericAdapter: Adapter = {
 
     $('script, style, noscript, iframe').remove();
 
-    const $root = pickContentRoot($);
-    if (!$root || $root.text().trim().length < 20) {
-      // 连正文都抽不出来：留一条"仅链接"，别整体失败（SPEC §6.2 底线）
-      return null;
-    }
-
     const title =
       metaContent($, 'meta[property="og:title"]') ??
       ($('h1').first().text().trim() || $('title').first().text().trim() || undefined);
@@ -81,6 +75,45 @@ export const genericAdapter: Adapter = {
       metaContent($, 'meta[name="pubdate"]');
     const publishedAt = publishedRaw ? new Date(publishedRaw) : undefined;
 
+    const $root = pickContentRoot($);
+
+    /**
+     * 没有正文容器时，可能本来就是个**图集**（截图墙、图片消息、相册页）。
+     * 这类页面没有可读文字，但内容就是图片本身，判失败会丢失内容。
+     * 门槛 ≥3 张：只有 1–2 张的大多是 logo / 头图，存下来是噪音。
+     */
+    if (!$root || $root.text().trim().length < 20) {
+      const { images } = harvestImages($, $('body'), {
+        referer: finalUrl,
+        cookie: ctx.cookie,
+      });
+
+      if (images.length >= 3) {
+        const bodyHtml = ($('body').html() ?? '').trim();
+        return {
+          type: 'image',
+          source: 'web',
+          title,
+          author,
+          siteName,
+          excerpt,
+          contentHtml: bodyHtml,
+          contentText: normalizeText($('body').text()) || (title ?? ''),
+          publishedAt:
+            publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : undefined,
+          coverUrl: images[0]?.url,
+          coverReferer: finalUrl,
+          images,
+          rawSnapshot: html,
+          meta: { finalUrl, imageCount: images.length, kind: 'gallery' },
+          warnings: [`没有正文容器，按图集录入，共 ${images.length} 张图`],
+        };
+      }
+
+      // 连正文都抽不出来：留一条"仅链接"，别整体失败（SPEC §6.2 底线）
+      return null;
+    }
+
     const { images } = harvestImages($, $root, { referer: finalUrl, cookie: ctx.cookie });
     const contentHtml = ($root.html() ?? '').trim();
     const contentText = normalizeText($root.text());
@@ -89,6 +122,33 @@ export const genericAdapter: Adapter = {
     // 宁可返回 null 让上层记成"仅保存了链接"，也不要存一张空卡片。
     const hasTitle = Boolean(title);
     const tooShort = hasTitle ? contentText.length < 60 : contentText.length < 150;
+
+    /**
+     * 图片为主的页面（图片消息、图集、截图墙）：文字必然少，
+     * 但内容其实是图片本身。这类不该判成失败，存成 image 条目更合理。
+     *
+     * 门槛定在 ≥2 张图：只要 1 张的大多是 logo / 头图，存下来是噪音。
+     */
+    if (tooShort && images.length >= 2) {
+      return {
+        type: 'image',
+        source: 'web',
+        title,
+        author,
+        siteName,
+        excerpt,
+        contentHtml,
+        contentText: contentText || (title ?? ''),
+        publishedAt: publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : undefined,
+        coverUrl: images[0]?.url,
+        coverReferer: finalUrl,
+        images,
+        rawSnapshot: html,
+        meta: { finalUrl, imageCount: images.length, kind: 'image-dominant' },
+        warnings: [`正文文字很少（${contentText.length} 字），按图片条目录入，共 ${images.length} 张图`],
+      };
+    }
+
     if (tooShort) {
       return null;
     }

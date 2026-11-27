@@ -14,6 +14,13 @@ import { sanitizeContent, htmlToText } from '../src/sanitize.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = readFileSync(join(here, 'fixtures/wechat-article.html'), 'utf8');
+// 图片消息：正文是一组图片，没有 #js_content
+const imagePost = readFileSync(join(here, 'fixtures/wechat-image-post.html'), 'utf8');
+// 模拟微信改版后的结构（没有标准容器的类名）
+const imagePostUnknown = readFileSync(
+  join(here, 'fixtures/wechat-image-post-unknown.html'),
+  'utf8',
+);
 
 let pass = 0;
 let fail = 0;
@@ -108,6 +115,85 @@ truthy('onclick 已剥离', !/\sonclic?k=/i.test(cleaned));
 truthy('外链加 rel', cleaned.includes('rel="noopener noreferrer nofollow"'));
 truthy('外链 target=_blank', cleaned.includes('target="_blank"'));
 truthy('htmlToText 能出文本', htmlToText(cleaned).length > 50);
+
+console.log('\n[图片消息：正文是图片，不能判成解析失败]');
+{
+  const r = await wechatAdapter.capture({
+    url: new URL('https://mp.weixin.qq.com/s/hQPHsxp75jp5v6MDMRTPIQ'),
+    html: imagePost,
+  });
+
+  if (!r) {
+    console.log('  FAIL 图片消息应能解析，不该返回 null');
+  } else {
+    eq('类型是 image', r.type, 'image');
+    eq('标题取自 #activity-name', r.title, '存好！Obsidian全系列保姆指南，一篇顶十篇');
+    eq('作者取自 #js_name', r.author, '白叔讲AI');
+    eq('抓到 3 张图', r.images.length, 3);
+    eq('封面用第一张', r.coverUrl?.includes('mmbiz_jpg/a/640'), true);
+    truthy('data-src 优先于 src', Boolean(r.images[0]?.url.includes('mmbiz_jpg/a/640')));
+    truthy('&amp; 已解码', Boolean(r.images[0]?.url.includes('&from=appmsg')));
+    truthy('描述进了正文', r.contentHtml.includes('从零开始轻松上手'));
+    eq(
+      '图片已换成占位符',
+      (r.contentHtml.match(/data-pb-img="/g) ?? []).length,
+      3,
+    );
+    eq('meta 标记了种类', r.meta.kind, 'image-post');
+    truthy('有提示说明这是图片消息', r.warnings.some((w) => w.includes('图片消息')));
+  }
+}
+
+console.log('\n[图片消息：微信改版后靠兜底也能解析]');
+{
+  const r = await wechatAdapter.capture({
+    url: new URL('https://mp.weixin.qq.com/s/unknownStructure'),
+    html: imagePostUnknown,
+  });
+
+  if (!r) {
+    console.log('  FAIL 结构变了也不该直接判失败');
+  } else {
+    eq('走的是兜底路径', r.meta.kind, 'image-post-fallback');
+    eq('抓到 3 张图', r.images.length, 3);
+    eq('标题仍然拿到了', r.title, '改版后的图片消息');
+    truthy('有提示说明结构可能变了', r.warnings.some((w) => w.includes('页面结构')));
+  }
+}
+
+console.log('\n[generic：没有正文的图集页也不该判失败]');
+{
+  const gallery = `<html><head><meta property="og:title" content="图片墙"></head><body>
+    <div class="grid">
+      <img src="https://example.com/1.jpg">
+      <img src="https://example.com/2.jpg">
+      <img src="https://example.com/3.jpg">
+    </div>
+  </body></html>`;
+
+  const r = await genericAdapter.capture({
+    url: new URL('https://example.com/gallery'),
+    html: gallery,
+  });
+
+  if (!r) {
+    console.log('  FAIL 3 张图的页面应能归档成图集');
+  } else {
+    eq('类型是 image', r.type, 'image');
+    eq('抓到 3 张图', r.images.length, 3);
+    eq('meta 标记为 gallery', r.meta.kind, 'gallery');
+    eq('标题来自 og:title', r.title, '图片墙');
+  }
+
+  // 只有 1 张图不该被当成图集（大多只是 logo）
+  const one = `<html><head><meta property="og:title" content="x"></head><body>
+    <img src="https://example.com/logo.png"></body></html>`;
+  const r2 = await genericAdapter.capture({
+    url: new URL('https://example.com/one'),
+    html: one,
+  });
+  eq('只有 1 张图仍判失败', r2, null);
+}
 
 console.log('\n[边界：非公众号页面不该被 wechat 认领]');
 eq('example.com 不命中', wechatAdapter.match(new URL('https://example.com/s')), false);

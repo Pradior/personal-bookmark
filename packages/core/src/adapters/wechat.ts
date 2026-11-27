@@ -30,6 +30,14 @@ function grabVar(html: string, name: string): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export const wechatAdapter: Adapter = {
   id: 'wechat',
   priority: 100,
@@ -70,9 +78,110 @@ export const wechatAdapter: Adapter = {
     const warnings: string[] = [];
     const $ = cheerio.load(html);
 
+    // ── 图片消息（公众号的另一种消息类型）─────────────────
+    // 正文基本就是一组图片，几乎没有文字，所以没有 #js_content。
+    // 2026-11-27 真机：这种文章两个 adapter 都解析不出，最后成了"无标题"的空卡片。
+    const $gallery = $('#js_image_content, .image-list, .image_content').first();
+    if ($gallery.length > 0) {
+      const galleryTitle =
+        $('#activity-name').text().trim() ||
+        $('meta[property="og:title"]').attr('content')?.trim() ||
+        grabVar(html, 'msg_title');
+
+      const desc = normalizeText(
+        $('#js_image_desc').text() ||
+          $('.image_desc').text() ||
+          $('meta[property="og:description"]').attr('content') ||
+          '',
+      );
+
+      const { images } = harvestImages($, $gallery, {
+        referer: WECHAT_REFERER,
+        userAgent: WECHAT_UA,
+        cookie: ctx.cookie,
+      });
+
+      if (images.length > 0) {
+        // 描述文字在图片之外，单独拼在正文前面
+        const descHtml = desc ? `<p>${escapeHtml(desc)}</p>` : '';
+        const contentHtml = [descHtml, ($gallery.html() ?? '').trim()]
+          .filter(Boolean)
+          .join('\n');
+
+        if (images.length === 0) warnings.push('图片消息里没找到可归档的图片');
+        warnings.push(`这是图片消息类型，共 ${images.length} 张图`);
+
+        return {
+          type: 'image',
+          source: 'wechat',
+          title: galleryTitle || undefined,
+          author:
+            $('#js_name').text().trim() ||
+            grabVar(html, 'nickname') ||
+            undefined,
+          siteName: '公众号',
+          excerpt: desc ? desc.slice(0, 120) : undefined,
+          contentHtml,
+          contentText: normalizeText(`${galleryTitle ?? ''}\n${desc}`),
+          coverUrl: images[0]?.url,
+          coverReferer: WECHAT_REFERER,
+          images,
+          rawSnapshot: html,
+          meta: { finalUrl, kind: 'image-post', imageCount: images.length },
+          warnings,
+        };
+      }
+    }
+
     // 2) 正文容器
     const $content = $('#js_content');
     if ($content.length === 0 || $content.text().trim().length < 20) {
+      /**
+       * 兜底：微信改过图片消息的 DOM（类名/ID 会变），上面的选择器可能不命中。
+       * 没有 #js_content 但又有一堆内容图，就按图片消息处理。
+       *
+       * 门槛 ≥3 张：头图、头像、二维码通常只有 1–2 张，混不进这个门槛；
+       * worker 那边还会按"源图 <120px"再过滤一次，双重保险。
+       */
+      if ($('#js_content').length === 0) {
+        const { images } = harvestImages($, $('body'), {
+          referer: WECHAT_REFERER,
+          userAgent: WECHAT_UA,
+          cookie: ctx.cookie,
+        });
+
+        if (images.length >= 3) {
+          const fbTitle =
+            $('#activity-name').text().trim() ||
+            $('meta[property="og:title"]').attr('content')?.trim() ||
+            grabVar(html, 'msg_title');
+          const fbDesc = normalizeText(
+            $('meta[property="og:description"]').attr('content') ?? '',
+          );
+
+          warnings.push(
+            `没找到标准正文容器，按图片消息处理（${images.length} 张图）。微信可能改了页面结构。`,
+          );
+
+          return {
+            type: 'image',
+            source: 'wechat',
+            title: fbTitle || undefined,
+            author: $('#js_name').text().trim() || grabVar(html, 'nickname') || undefined,
+            siteName: '公众号',
+            excerpt: fbDesc ? fbDesc.slice(0, 120) : undefined,
+            contentHtml: $('body').html() ?? '',
+            contentText: normalizeText(`${fbTitle ?? ''}\n${fbDesc}`),
+            coverUrl: images[0]?.url,
+            coverReferer: WECHAT_REFERER,
+            images,
+            rawSnapshot: html,
+            meta: { finalUrl, kind: 'image-post-fallback', imageCount: images.length },
+            warnings,
+          };
+        }
+      }
+
       // 认领了但解析不出来 —— 交给 generic 兜底
       return null;
     }

@@ -1714,6 +1714,50 @@ CSS 变量 + `data-theme`，一套 token 撑三种主题。
 
 ILIKE 的 `%` `_` 必须转义，否则用户输入一个 `%` 就变成全表匹配。
 
+#### 公众号「图片消息」（v1.1）
+
+公众号有两种消息类型，正文结构完全不同：
+
+| 类型 | 结构 | 处理 |
+|---|---|---|
+| 图文消息 | `#js_content` 里有段落 | 原有逻辑 |
+| **图片消息** | 正文是一组图片，**没有 `#js_content`** | 走图片分支，`type='image'` |
+
+图片消息的识别用三层，从精确到宽松：
+
+1. `#js_image_content` / `.image-list` / `.image_content` → `kind='image-post'`
+2. 结构变了但页面里有 ≥3 张图 → `kind='image-post-fallback'`
+3. 都没有 → 交给 generic，而 generic 在"没有正文容器 + ≥3 张图"时按图集录入（`kind='gallery'`）
+
+**门槛为什么是 3 张**：头图、头像、二维码通常只有 1–2 张，3 张能有效排除；
+worker 那边还会按"源图 <120px"再过滤一次，双重保险。
+
+2026-11-27 真机：`mp.weixin.qq.com/s/hQPHsxp75jp5v6MDMRTPIQ` 这种图片消息
+两个 adapter 都解析不出，最后成了一张"无标题"的空卡片（提示
+`adapter: wechat → generic`）。这条链路现在有 11 项断言守着。
+
+#### 公众号「图片消息」（v1.1）
+
+公众号有两种消息类型，正文结构完全不同：
+
+| 类型 | 结构 | 处理 |
+|---|---|---|
+| 图文消息 | `#js_content` 里有段落 | 原有逻辑 |
+| **图片消息** | 正文是一组图片，**没有 `#js_content`** | 走图片分支，`type='image'` |
+
+识别用三层，从精确到宽松：
+
+1. `#js_image_content` / `.image-list` / `.image_content` → `kind='image-post'`
+2. 结构变了但页面里有 ≥3 张图 → `kind='image-post-fallback'`
+3. 都没有 → 交给 generic；generic 在"没有正文容器 + ≥3 张图"时按图集录入（`kind='gallery'`）
+
+**门槛为什么是 3 张**：头图、头像、二维码通常只有 1–2 张，3 张能有效排除；
+worker 还会按"源图 <120px"再过滤一次，双重保险。
+
+2026-11-27 真机：`mp.weixin.qq.com/s/hQPHsxp75jp5v6MDMRTPIQ` 这种图片消息
+两个 adapter 都解析不出，最后成了一张「无标题」空卡片（提示 `adapter: wechat → generic`）。
+这条链路现在有 20 项断言守着。
+
 #### 双栏预览（v1.0）
 
 宽屏（≥1280px，右栏存在）时：**单击卡片 → 右栏预览，双击 → 独立阅读页**。
